@@ -227,6 +227,17 @@
             border: 1px solid var(--border-color);
         }
 
+        .category-tabs-2 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
+            margin-bottom: 14px;
+            background: var(--surface-card);
+            padding: 4px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+        }
+
         .category-tab-btn {
             padding: 8px 4px;
             border: none;
@@ -302,6 +313,17 @@
         .btn-action-small.following {
             background: var(--surface-hover);
             border-color: transparent;
+        }
+
+        .btn-primary-small {
+            background: var(--text-primary);
+            border: 1px solid var(--text-primary);
+            color: var(--bg-main);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            font-weight: 800;
+            cursor: pointer;
         }
 
         .trophy-card {
@@ -510,6 +532,80 @@
             display: flex;
             gap: 6px;
             margin-top: 8px;
+        }
+
+        /* サークルチャット用スタイル */
+        .chat-box-container {
+            background: var(--surface-card);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            height: 52vh;
+            min-height: 320px;
+        }
+
+        .chat-messages-area {
+            flex-grow: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding-right: 4px;
+            margin-bottom: 12px;
+        }
+
+        .chat-bubble-row {
+            display: flex;
+            flex-direction: column;
+            max-width: 82%;
+        }
+
+        .chat-bubble-row.me {
+            align-self: flex-end;
+            align-items: flex-end;
+        }
+
+        .chat-bubble-row.other {
+            align-self: flex-start;
+            align-items: flex-start;
+        }
+
+        .chat-sender-name {
+            font-size: 0.62rem;
+            color: var(--text-secondary);
+            margin-bottom: 3px;
+            padding: 0 4px;
+        }
+
+        .chat-bubble {
+            padding: 9px 12px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            line-height: 1.4;
+            word-break: break-word;
+        }
+
+        .chat-bubble-row.me .chat-bubble {
+            background: var(--text-primary);
+            color: var(--bg-main);
+            border-bottom-right-radius: 2px;
+            font-weight: 500;
+        }
+
+        .chat-bubble-row.other .chat-bubble {
+            background: var(--surface-hover);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-bottom-left-radius: 2px;
+        }
+
+        .chat-time {
+            font-size: 0.55rem;
+            color: var(--text-tertiary);
+            margin-top: 2px;
+            padding: 0 4px;
         }
 
         .gallery-grid-3 {
@@ -912,7 +1008,7 @@
     <header>
         <div class="header-top">
             <div class="brand-logo" onclick="switchMainTab('trophies')">
-                Life Trophies <span class="version-badge">v5.1</span>
+                Life Trophies <span class="version-badge">v5.2</span>
             </div>
             <div class="header-right">
                 <button class="header-icon-btn" onclick="openNotificationsModal()">
@@ -990,6 +1086,8 @@
         let circleTrophies = [];
         let activeCircles = [];
         let currentActiveCircleId = null;
+        let circleRoomSubTab = 'trophies'; // 'trophies' or 'chat'
+        let lastCircleSearchQuery = "";
         let revertedIds = [];
         let isSignUpMode = false;
         let isAuthProcessing = false;
@@ -1622,7 +1720,10 @@
 
             if (tab === 'trophies') renderTrophiesView();
             else if (tab === 'feed') renderFeedView();
-            else if (tab === 'circle') renderCircleView();
+            else if (tab === 'circle') {
+                currentActiveCircleId = null;
+                renderCircleView();
+            }
             else if (tab === 'search') renderSearchView();
             else if (tab === 'profile') renderMyProfileView();
         }
@@ -1656,35 +1757,49 @@
 
         /* -------------------------------------------------------------
            サークルデータのクラウド＆ローカルハイブリッド同期ヘルパー
-           （Firestoreのセキュリティルール変更不要で動作する設計）
         ------------------------------------------------------------- */
+        function getDeletedCircleIds() {
+            try {
+                const s = localStorage.getItem('lt_deleted_circles');
+                return s ? JSON.parse(s) : [];
+            } catch (e) { return []; }
+        }
+
         async function fetchAllCirclesSafe() {
+            const deletedIds = getDeletedCircleIds();
             const circleMap = {};
             try {
                 const localStr = localStorage.getItem('lt_circles_cache');
                 if (localStr) {
-                    JSON.parse(localStr).forEach(c => { if (c && c.id) circleMap[c.id] = c; });
+                    JSON.parse(localStr).forEach(c => {
+                        if (c && c.id && !deletedIds.includes(c.id) && !c.isDeleted) {
+                            circleMap[c.id] = c;
+                        }
+                    });
                 }
             } catch (e) {}
 
-            // 既存の許可済み posts コレクションからサークルデータを取得
             try {
                 const snap = await withTimeout(db.collection('posts').where('isCircleDoc', '==', true).get(), 2000);
                 if (snap) {
                     snap.forEach(doc => {
                         const d = doc.data();
                         const cid = d.circleId || doc.id;
-                        circleMap[cid] = Object.assign({ id: cid }, d);
+                        if (!deletedIds.includes(cid) && !d.isDeleted) {
+                            circleMap[cid] = Object.assign({ id: cid }, d);
+                        }
                     });
                 }
             } catch (e) {}
 
-            // circles コレクションからも念のため取得試行
             try {
                 const snap2 = await withTimeout(db.collection('circles').get(), 1500);
                 if (snap2) {
                     snap2.forEach(doc => {
-                        circleMap[doc.id] = Object.assign({ id: doc.id }, doc.data());
+                        const d = doc.data();
+                        if (!deletedIds.includes(doc.id) && !d.isDeleted) {
+                            circleMap[doc.id] = Object.assign({ id: doc.id }, d);
+                        }
                     });
                 }
             } catch (e) {}
@@ -1703,7 +1818,6 @@
                 isCircleDoc: true
             });
 
-            // ローカルキャッシュを即時更新
             try {
                 const localStr = localStorage.getItem('lt_circles_cache');
                 let list = localStr ? JSON.parse(localStr) : [];
@@ -1713,7 +1827,6 @@
                 localStorage.setItem('lt_circles_cache', JSON.stringify(list));
             } catch (e) {}
 
-            // posts コレクションと circles コレクションの両方に非同期保存
             try {
                 await db.collection('posts').doc(circleId).set(payload, { merge: true });
             } catch (e) {}
@@ -1722,10 +1835,48 @@
             } catch (e) {}
         }
 
+        async function deleteCircleCompletely(circleId) {
+            // 削除済みリストへ記録
+            try {
+                const delList = getDeletedCircleIds();
+                if (!delList.includes(circleId)) delList.push(circleId);
+                localStorage.setItem('lt_deleted_circles', JSON.stringify(delList));
+            } catch (e) {}
+
+            // ローカルキャッシュから除去
+            try {
+                const localStr = localStorage.getItem('lt_circles_cache');
+                if (localStr) {
+                    const list = JSON.parse(localStr).filter(c => c.id !== circleId);
+                    localStorage.setItem('lt_circles_cache', JSON.stringify(list));
+                }
+            } catch (e) {}
+
+            activeCircles = activeCircles.filter(c => c.id !== circleId);
+            myProfile.joinedCircles = (myProfile.joinedCircles || []).filter(id => id !== circleId);
+            if (currentUser) {
+                saveProfileToLocalCache(currentUser.uid, myProfile);
+                syncProfileToCloudBackground(currentUser.uid, myProfile);
+            }
+
+            // クラウド側から削除（万が一削除権限がなくても isDeleted フラグで非表示化）
+            try {
+                await db.collection('posts').doc(circleId).delete();
+            } catch (e) {
+                try { await db.collection('posts').doc(circleId).set({ isDeleted: true }, { merge: true }); } catch (err) {}
+            }
+            try {
+                await db.collection('circles').doc(circleId).delete();
+            } catch (e) {
+                try { await db.collection('circles').doc(circleId).set({ isDeleted: true }, { merge: true }); } catch (err) {}
+            }
+        }
+
         async function loadCircleTrophiesForBoard() {
             circleTrophies = [];
             try {
                 const allCircles = await fetchAllCirclesSafe();
+                activeCircles = allCircles;
                 allCircles.forEach(cData => {
                     const members = Array.isArray(cData.members) ? cData.members : [];
                     const isJoined = (currentUser && members.includes(currentUser.uid)) || (myProfile.joinedCircles || []).includes(cData.id);
@@ -1979,7 +2130,7 @@
         }
 
         /* -------------------------------------------------------------
-           サークル（Circle）機能 View & ロジック
+           ⭕ サークル機能 View & ロジック（検索・参加中一覧・専用ルーム・チャット・解散）
         ------------------------------------------------------------- */
         async function renderCircleView() {
             const container = document.getElementById('main-container');
@@ -1988,85 +2139,399 @@
 
             activeCircles = await fetchAllCirclesSafe();
 
+            // 特定のサークルメニュー（専用ルーム）を開いている場合
+            if (currentActiveCircleId) {
+                const targetCircle = activeCircles.find(c => c.id === currentActiveCircleId);
+                if (targetCircle) {
+                    renderCircleRoomView(targetCircle);
+                    return;
+                } else {
+                    currentActiveCircleId = null;
+                }
+            }
+
             container.innerHTML = `
-                <div style="font-size:0.9rem; font-weight:800; margin-bottom:14px; text-align:center;">⭕ サークル機能</div>
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                    <div style="font-size:0.8rem; font-weight:700; color:var(--text-secondary);">コミュニティ＆サークル実績</div>
+                    <div style="font-size:0.95rem; font-weight:900;">⭕ サークル</div>
                     <button class="btn-action-small" onclick="openModal('create-circle-modal')">+ サークルを立ち上げる</button>
                 </div>
-                <div id="circle-list-container"></div>
+
+                <!-- 参加中のサークル一覧 -->
+                <div style="font-size:0.8rem; font-weight:800; color:var(--text-secondary); margin-bottom:8px;">📌 参加中のサークル</div>
+                <div id="joined-circles-container" style="margin-bottom:22px;"></div>
+
+                <!-- サークル検索（ユーザー検索と同じ仕様） -->
+                <div style="font-size:0.8rem; font-weight:800; color:var(--text-secondary); margin-bottom:8px;">🔍 サークル検索</div>
+                <div style="display:flex; gap:10px; margin-bottom:14px;">
+                    <input type="text" id="circle-search-query" class="form-input" placeholder="サークル名やキーワードを入力..." style="margin-bottom:0;" oninput="searchCircles()">
+                    <button class="modal-btn" style="width: 85px; margin-top:0;" onclick="searchCircles()">検索</button>
+                </div>
+                <div id="circle-search-results">
+                    <div style="text-align:center; color:var(--text-secondary); font-size:0.78rem; padding:24px 16px; background:var(--surface-card); border-radius:12px; border:1px solid var(--border-color);">
+                        検索したいサークル名やキーワードを入力してください
+                    </div>
+                </div>
             `;
 
-            renderCircleList();
+            renderJoinedCirclesList();
+
+            if (lastCircleSearchQuery) {
+                const qInput = document.getElementById('circle-search-query');
+                if (qInput) {
+                    qInput.value = lastCircleSearchQuery;
+                    searchCircles();
+                }
+            }
         }
 
-        function renderCircleList() {
-            const listEl = document.getElementById('circle-list-container');
+        function renderJoinedCirclesList() {
+            const listEl = document.getElementById('joined-circles-container');
             if (!listEl) return;
             listEl.innerHTML = '';
 
-            if (activeCircles.length === 0) {
-                listEl.innerHTML = '<div style="text-align:center; color:var(--text-secondary); font-size:0.8rem; padding:30px; background:var(--surface-card); border-radius:12px;">まだ作成されたサークルはありません。最初のサークルを立ち上げよう！</div>';
+            const joinedList = activeCircles.filter(circle => {
+                const members = Array.isArray(circle.members) ? circle.members : [];
+                return (currentUser && members.includes(currentUser.uid)) || (myProfile.joinedCircles || []).includes(circle.id);
+            });
+
+            if (joinedList.length === 0) {
+                listEl.innerHTML = `
+                    <div style="text-align:center; color:var(--text-secondary); font-size:0.78rem; padding:22px 16px; background:var(--surface-card); border-radius:12px; border:1px dashed var(--border-color);">
+                        まだ参加しているサークルがありません。<br>下の検索窓から探すか、「+ サークルを立ち上げる」から作成しよう！
+                    </div>
+                `;
                 return;
             }
 
-            activeCircles.forEach(circle => {
+            joinedList.forEach(circle => {
+                const members = Array.isArray(circle.members) ? circle.members : [];
+                const trophies = Array.isArray(circle.circleTrophies) ? circle.circleTrophies : [];
+                const chats = Array.isArray(circle.chatMessages) ? circle.chatMessages : [];
+                const isHost = currentUser && circle.hostUid === currentUser.uid;
+
+                const card = document.createElement('div');
+                card.className = 'feed-card';
+                card.style.cssText = 'margin-bottom:10px; padding:14px 16px; cursor:pointer;';
+                card.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                        <div style="font-size:0.95rem; font-weight:900; color:var(--text-primary);">
+                            ⭕ ${circle.circleName}
+                            ${isHost ? '<span style="font-size:0.6rem; background:var(--surface-hover); border:1px solid var(--border-light); padding:2px 6px; border-radius:4px; margin-left:6px; vertical-align:middle;">👑 ホスト</span>' : ''}
+                        </div>
+                        <button class="btn-primary-small">メニューへ <i class="fa-solid fa-chevron-right" style="font-size:0.6rem;"></i></button>
+                    </div>
+                    <div style="font-size:0.74rem; color:var(--text-secondary); margin-bottom:8px; line-height:1.3;">${circle.circleBio || '自己紹介なし'}</div>
+                    <div style="font-size:0.65rem; color:var(--text-tertiary);">
+                        👑 ホスト: <b>${circle.hostName || '不明'}</b> ・ 👥 メンバー: <b>${members.length}人</b> ・ 🏆 実績: <b>${trophies.length}件</b> ・ 💬 チャット: <b>${chats.length}件</b>
+                    </div>
+                `;
+                card.onclick = () => openCircleMenu(circle.id);
+                listEl.appendChild(card);
+            });
+        }
+
+        function searchCircles() {
+            const qInput = document.getElementById('circle-search-query');
+            const resultsEl = document.getElementById('circle-search-results');
+            if (!qInput || !resultsEl) return;
+
+            const rawQ = qInput.value.trim().toLowerCase();
+            lastCircleSearchQuery = qInput.value.trim();
+
+            if (!rawQ) {
+                resultsEl.innerHTML = `
+                    <div style="text-align:center; color:var(--text-secondary); font-size:0.78rem; padding:24px 16px; background:var(--surface-card); border-radius:12px; border:1px solid var(--border-color);">
+                        検索したいサークル名やキーワードを入力してください
+                    </div>
+                `;
+                return;
+            }
+
+            const matched = activeCircles.filter(c => {
+                const cName = String(c.circleName || '').toLowerCase();
+                const cBio = String(c.circleBio || '').toLowerCase();
+                const hName = String(c.hostName || '').toLowerCase();
+                return cName.includes(rawQ) || cBio.includes(rawQ) || hName.includes(rawQ);
+            });
+
+            resultsEl.innerHTML = '';
+
+            const headerLabel = document.createElement('div');
+            headerLabel.style.cssText = 'font-size:0.75rem; font-weight:700; color:var(--text-secondary); margin-bottom:10px;';
+            headerLabel.innerText = `「${lastCircleSearchQuery}」のサークル検索結果 (${matched.length}件)`;
+            resultsEl.appendChild(headerLabel);
+
+            if (matched.length === 0) {
+                resultsEl.innerHTML += `
+                    <div style="text-align:center; color:var(--text-secondary); font-size:0.8rem; padding:24px; background:var(--surface-card); border-radius:12px; border:1px solid var(--border-color);">
+                        一致するサークルが見つかりませんでした
+                    </div>
+                `;
+                return;
+            }
+
+            matched.forEach(circle => {
                 const members = Array.isArray(circle.members) ? circle.members : [];
                 const isJoined = (currentUser && members.includes(currentUser.uid)) || (myProfile.joinedCircles || []).includes(circle.id);
                 const trophies = Array.isArray(circle.circleTrophies) ? circle.circleTrophies : [];
 
                 const card = document.createElement('div');
                 card.className = 'feed-card';
-                card.style.cssText = 'margin-bottom: 14px; padding: 16px;';
+                card.style.cssText = 'margin-bottom:10px; padding:14px 16px;';
                 card.innerHTML = `
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                        <div style="font-size:1rem; font-weight:900; color:var(--text-primary);">⭕ ${circle.circleName}</div>
-                        <button class="btn-action-small ${isJoined ? 'following' : ''}" onclick="toggleJoinCircle('${circle.id}', ${isJoined})">
-                            ${isJoined ? '参加中' : 'サークルに参加'}
-                        </button>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:8px;">
+                        <div style="font-size:0.95rem; font-weight:900; color:var(--text-primary);">⭕ ${circle.circleName}</div>
+                        <div style="display:flex; gap:6px; flex-shrink:0;">
+                            ${isJoined
+                                ? `<button class="btn-primary-small" onclick="openCircleMenu('${circle.id}')">メニューを開く</button>`
+                                : `<button class="btn-action-small" onclick="joinCircleAndOpenMenu('${circle.id}')">参加して開く</button>`
+                            }
+                        </div>
                     </div>
-                    <div style="font-size:0.75rem; color:var(--text-secondary); margin-bottom:10px; line-height:1.4;">${circle.circleBio || '自己紹介なし'}</div>
-                    <div style="font-size:0.68rem; color:var(--text-tertiary); margin-bottom:12px;">
+                    <div style="font-size:0.74rem; color:var(--text-secondary); margin-bottom:8px; line-height:1.3;">${circle.circleBio || '自己紹介なし'}</div>
+                    <div style="font-size:0.65rem; color:var(--text-tertiary);">
                         👑 ホスト: <b>${circle.hostName || '不明'}</b> ・ 👥 メンバー: <b>${members.length}人</b> ・ 🏆 サークル実績: <b>${trophies.length}件</b>
                     </div>
-                    ${isJoined ? `
-                        <div style="border-top:1px solid var(--border-color); padding-top:10px; margin-top:10px;">
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                                <div style="font-size:0.78rem; font-weight:800;">サークル専用実績一覧</div>
-                                <button class="btn-action-small" onclick="openCircleTrophyModal('${circle.id}')">+ サークル実績を作成</button>
-                            </div>
-                            <div id="circle-trophies-${circle.id}"></div>
-                        </div>
-                    ` : '<div style="font-size:0.7rem; color:var(--text-tertiary); font-style:italic;">※参加するとこのサークルの実績を作成・解除できるようになります</div>'}
                 `;
+                resultsEl.appendChild(card);
+            });
+        }
 
-                listEl.appendChild(card);
+        function openCircleMenu(circleId) {
+            currentActiveCircleId = circleId;
+            circleRoomSubTab = 'trophies';
+            renderCircleView();
+        }
 
-                if (isJoined) {
-                    const tContainer = document.getElementById(`circle-trophies-${circle.id}`);
-                    if (tContainer) {
-                        if (trophies.length === 0) {
-                            tContainer.innerHTML = '<div style="font-size:0.72rem; color:var(--text-secondary); padding:6px 0;">まだサークル実績がありません。メンバー全員が作成できます！</div>';
-                        } else {
-                            trophies.forEach(ct => {
-                                const isUnlocked = !!userState[ct.id];
-                                const tItem = document.createElement('div');
-                                tItem.style.cssText = 'background:var(--surface-hover); border:1px solid var(--border-color); padding:8px 10px; border-radius:8px; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between; gap:10px;';
-                                tItem.innerHTML = `
-                                    <div style="overflow:hidden;">
-                                        <div style="font-size:0.8rem; font-weight:700;">✨ ${ct.name}</div>
-                                        <div style="font-size:0.7rem; color:var(--text-secondary);">${ct.condition}</div>
-                                    </div>
-                                    <div>
-                                        ${isUnlocked ? '<span class="unlocked-tag"><i class="fa-solid fa-check"></i> 解除済</span>' : `<button class="unlock-btn" onclick="openUnlockModal('${ct.id}')">解除</button>`}
-                                    </div>
-                                `;
-                                tContainer.appendChild(tItem);
-                            });
-                        }
+        async function joinCircleAndOpenMenu(circleId) {
+            if (!currentUser) return;
+            const uid = currentUser.uid;
+            const targetCircle = activeCircles.find(c => c.id === circleId);
+            if (!targetCircle) return;
+
+            let members = Array.isArray(targetCircle.members) ? [...targetCircle.members] : [];
+            if (!members.includes(uid)) members.push(uid);
+            targetCircle.members = members;
+
+            if (!myProfile.joinedCircles) myProfile.joinedCircles = [];
+            if (!myProfile.joinedCircles.includes(circleId)) myProfile.joinedCircles.push(circleId);
+
+            await saveCircleSafe(circleId, targetCircle);
+            saveProfileToLocalCache(uid, myProfile);
+            syncProfileToCloudBackground(uid, myProfile);
+
+            showNotification(`「${targetCircle.circleName}」に参加しました！`, 'CIRCLE JOINED');
+            openCircleMenu(circleId);
+        }
+
+        /* -------------------------------------------------------------
+           ⭕ サークル専用メニュー（ルーム画面：実績 ＆ チャット ＆ 解散機能）
+        ------------------------------------------------------------- */
+        function renderCircleRoomView(circle) {
+            const container = document.getElementById('main-container');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const members = Array.isArray(circle.members) ? circle.members : [];
+            const isHost = currentUser && circle.hostUid === currentUser.uid;
+            const trophies = Array.isArray(circle.circleTrophies) ? circle.circleTrophies : [];
+            const chats = Array.isArray(circle.chatMessages) ? circle.chatMessages : [];
+
+            // 上部ナビ（戻るボタン ＆ 退会 / ホスト専用解散ボタン）
+            const topBar = document.createElement('div');
+            topBar.style.cssText = 'display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;';
+            topBar.innerHTML = `
+                <button class="btn-action-small" onclick="currentActiveCircleId=null; renderCircleView();">
+                    <i class="fa-solid fa-arrow-left"></i> サークル一覧・検索へ戻る
+                </button>
+                <div style="display:flex; gap:6px;">
+                    ${isHost
+                        ? `<button class="delete-btn" onclick="disbandCircle('${circle.id}')"><i class="fa-solid fa-trash"></i> サークルを解散</button>`
+                        : `<button class="btn-action-small" onclick="leaveCircleFromRoom('${circle.id}')">退会する</button>`
+                    }
+                </div>
+            `;
+            container.appendChild(topBar);
+
+            // サークルヘッダーバナー
+            const banner = document.createElement('div');
+            banner.className = 'feed-card';
+            banner.style.cssText = 'margin-bottom:14px; padding:16px;';
+            banner.innerHTML = `
+                <div style="font-size:1.1rem; font-weight:900; color:var(--text-primary); margin-bottom:4px;">
+                    ⭕ ${circle.circleName}
+                </div>
+                <div style="font-size:0.78rem; color:var(--text-secondary); margin-bottom:10px; line-height:1.4;">
+                    ${circle.circleBio || '自己紹介なし'}
+                </div>
+                <div style="font-size:0.68rem; color:var(--text-tertiary);">
+                    👑 ホスト: <b>${circle.hostName || '不明'}</b> ・ 👥 メンバー: <b>${members.length}人</b>
+                </div>
+            `;
+            container.appendChild(banner);
+
+            // サークル内サブタブ（サークル実績 / メンバーチャット）
+            const subTabs = document.createElement('div');
+            subTabs.className = 'category-tabs-2';
+            subTabs.innerHTML = `
+                <button class="category-tab-btn ${circleRoomSubTab === 'trophies' ? 'active' : ''}" onclick="circleRoomSubTab='trophies'; renderCircleView();">
+                    🏆 サークル実績 (${trophies.length})
+                </button>
+                <button class="category-tab-btn ${circleRoomSubTab === 'chat' ? 'active' : ''}" onclick="circleRoomSubTab='chat'; renderCircleView();">
+                    💬 メンバーチャット (${chats.length})
+                </button>
+            `;
+            container.appendChild(subTabs);
+
+            if (circleRoomSubTab === 'trophies') {
+                const actionHeader = document.createElement('div');
+                actionHeader.style.cssText = 'display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;';
+                actionHeader.innerHTML = `
+                    <div style="font-size:0.85rem; font-weight:800;">🏆 サークル専用実績</div>
+                    <button class="btn-action-small" onclick="openCircleTrophyModal('${circle.id}')">+ サークル実績を作成</button>
+                `;
+                container.appendChild(actionHeader);
+
+                const tListEl = document.createElement('div');
+                if (trophies.length === 0) {
+                    tListEl.innerHTML = `
+                        <div style="text-align:center; color:var(--text-secondary); font-size:0.78rem; padding:32px 16px; background:var(--surface-card); border-radius:12px; border:1px dashed var(--border-color);">
+                            まだサークル実績がありません。<br>右上の「+ サークル実績を作成」からメンバーみんなで目標を追加しよう！
+                        </div>
+                    `;
+                } else {
+                    trophies.forEach(ct => {
+                        const isUnlocked = !!userState[ct.id];
+                        const card = document.createElement('div');
+                        card.className = `trophy-card ${isUnlocked ? 'unlocked' : ''}`;
+                        const iconContent = (isUnlocked && userState[ct.id].photo)
+                            ? `<img src="${userState[ct.id].photo}" alt="Photo">`
+                            : `<i class="fa-solid fa-trophy"></i>`;
+
+                        card.innerHTML = `
+                            <div class="icon-box">${iconContent}</div>
+                            <div class="trophy-info">
+                                <div class="trophy-name">✨ ${ct.name}</div>
+                                <div class="trophy-condition">${ct.condition}</div>
+                                <div class="trophy-meta">
+                                    <span class="rank-tag">${ct.rank || 'gold'}</span>
+                                    ${isUnlocked ? `<span class="unlocked-tag"><i class="fa-solid fa-check"></i> ${userState[ct.id].date} 解除済</span>` : ''}
+                                </div>
+                            </div>
+                            <div class="card-actions-group">
+                                ${!isUnlocked ? `<button class="unlock-btn" onclick="openUnlockModal('${ct.id}')">解除</button>` : ''}
+                            </div>
+                        `;
+                        tListEl.appendChild(card);
+                    });
+                }
+                container.appendChild(tListEl);
+
+            } else {
+                // メンバーチャット画面
+                const chatBox = document.createElement('div');
+                chatBox.className = 'chat-box-container';
+                chatBox.innerHTML = `
+                    <div class="chat-messages-area" id="circle-chat-messages"></div>
+                    <form onsubmit="event.preventDefault(); sendCircleChatMessage('${circle.id}');" style="display:flex; gap:8px;">
+                        <input type="text" id="circle-chat-input" class="form-input" placeholder="メンバーにメッセージを送る..." style="margin-bottom:0; font-size:0.82rem; padding:10px 12px;">
+                        <button type="submit" class="modal-btn" style="width:75px; margin-top:0; padding:10px;">送信</button>
+                    </form>
+                `;
+                container.appendChild(chatBox);
+
+                const msgArea = document.getElementById('circle-chat-messages');
+                if (msgArea) {
+                    if (chats.length === 0) {
+                        msgArea.innerHTML = `
+                            <div style="text-align:center; color:var(--text-secondary); font-size:0.75rem; margin:auto;">
+                                💬 まだメッセージがありません。<br>最初のメッセージを送ってみよう！
+                            </div>
+                        `;
+                    } else {
+                        chats.forEach(m => {
+                            const isMe = currentUser && m.uid === currentUser.uid;
+                            const row = document.createElement('div');
+                            row.className = `chat-bubble-row ${isMe ? 'me' : 'other'}`;
+                            row.innerHTML = `
+                                <div class="chat-sender-name">${isMe ? 'あなた' : (m.senderName || 'メンバー')}</div>
+                                <div class="chat-bubble">${m.text}</div>
+                                <div class="chat-time">${m.time || ''}</div>
+                            `;
+                            msgArea.appendChild(row);
+                        });
+                        msgArea.scrollTop = msgArea.scrollHeight;
                     }
                 }
-            });
+            }
+        }
+
+        async function sendCircleChatMessage(circleId) {
+            if (!currentUser) return;
+            const input = document.getElementById('circle-chat-input');
+            if (!input) return;
+            const text = input.value.trim();
+            if (!text) return;
+
+            const targetCircle = activeCircles.find(c => c.id === circleId);
+            if (!targetCircle) return;
+
+            const now = new Date();
+            const timeStr = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+            const newMsg = {
+                id: 'msg_' + Date.now(),
+                uid: currentUser.uid,
+                senderName: myProfile.displayName || myProfile.username || 'メンバー',
+                text: text,
+                time: timeStr
+            };
+
+            if (!Array.isArray(targetCircle.chatMessages)) targetCircle.chatMessages = [];
+            targetCircle.chatMessages.push(newMsg);
+
+            input.value = '';
+            renderCircleRoomView(targetCircle);
+
+            await saveCircleSafe(circleId, targetCircle);
+        }
+
+        async function disbandCircle(circleId) {
+            if (!currentUser) return;
+            const targetCircle = activeCircles.find(c => c.id === circleId);
+            if (!targetCircle) return;
+
+            if (targetCircle.hostUid !== currentUser.uid) {
+                return alert('サークルの解散はホスト（作成者）のみ実行できます。');
+            }
+
+            if (!confirm(`本当にサークル「${targetCircle.circleName}」を解散（完全削除）しますか？\n※サークル内のチャットやサークル実績もすべて削除され、元に戻せません。`)) return;
+
+            await deleteCircleCompletely(circleId);
+            currentActiveCircleId = null;
+            await loadCircleTrophiesForBoard();
+            showNotification(`サークル「${targetCircle.circleName}」を解散しました`, 'CIRCLE DISBANDED');
+            renderCircleView();
+        }
+
+        async function leaveCircleFromRoom(circleId) {
+            if (!currentUser) return;
+            const targetCircle = activeCircles.find(c => c.id === circleId);
+            if (!targetCircle) return;
+
+            if (!confirm(`サークル「${targetCircle.circleName}」から退会しますか？`)) return;
+
+            const uid = currentUser.uid;
+            targetCircle.members = (targetCircle.members || []).filter(id => id !== uid);
+            myProfile.joinedCircles = (myProfile.joinedCircles || []).filter(id => id !== circleId);
+
+            await saveCircleSafe(circleId, targetCircle);
+            saveProfileToLocalCache(uid, myProfile);
+            syncProfileToCloudBackground(uid, myProfile);
+
+            currentActiveCircleId = null;
+            showNotification('サークルを退会しました', 'CIRCLE LEFT');
+            renderCircleView();
         }
 
         async function createCircle() {
@@ -2089,6 +2554,7 @@
                 hostName: myProfile.displayName || myProfile.username || 'ユーザー',
                 members: [currentUser.uid],
                 circleTrophies: [],
+                chatMessages: [],
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             };
 
@@ -2103,33 +2569,9 @@
             bioInput.value = '';
             closeModal('create-circle-modal');
             showNotification(`サークル「${cName}」を立ち上げました！`, 'CIRCLE CREATED');
-            renderCircleView();
-        }
-
-        async function toggleJoinCircle(circleId, isJoined) {
-            if (!currentUser) return;
-            const uid = currentUser.uid;
-            const targetCircle = activeCircles.find(c => c.id === circleId);
-            if (!targetCircle) return;
-
-            let members = Array.isArray(targetCircle.members) ? [...targetCircle.members] : [];
-
-            if (isJoined) {
-                members = members.filter(id => id !== uid);
-                myProfile.joinedCircles = (myProfile.joinedCircles || []).filter(id => id !== circleId);
-                showNotification('サークルを退会しました', 'CIRCLE LEFT');
-            } else {
-                if (!members.includes(uid)) members.push(uid);
-                if (!myProfile.joinedCircles) myProfile.joinedCircles = [];
-                if (!myProfile.joinedCircles.includes(circleId)) myProfile.joinedCircles.push(circleId);
-                showNotification('サークルに参加しました！', 'CIRCLE JOINED');
-            }
-
-            targetCircle.members = members;
-            await saveCircleSafe(circleId, targetCircle);
-            saveProfileToLocalCache(uid, myProfile);
-            syncProfileToCloudBackground(uid, myProfile);
-            renderCircleView();
+            
+            // 立ち上げたらそのままサークル専用メニューへ飛ぶ
+            openCircleMenu(circleId);
         }
 
         function openCircleTrophyModal(circleId) {
@@ -2252,7 +2694,8 @@
             userState[unlockedId] = unlockEntry;
 
             closeModal('unlock-modal');
-            switchMainTab(activeTab);
+            if (activeTab === 'circle') renderCircleView();
+            else switchMainTab(activeTab);
             showNotification(`実績を解除しました！「${trophyName}」`, 'TROPHY UNLOCKED!');
 
             saveSingleUnlockToStorage(unlockedId, unlockEntry);
@@ -2277,7 +2720,7 @@
         }
 
         /* -------------------------------------------------------------
-           ホーム（タイムライン）View （構文エラー完全修正＆復活）
+           ホーム（タイムライン）View
         ------------------------------------------------------------- */
         async function renderFeedView() {
             const container = document.getElementById('main-container');
@@ -2446,7 +2889,7 @@
         }
 
         /* -------------------------------------------------------------
-           ユーザー検索 View （完全復活）
+           ユーザー検索 View
         ------------------------------------------------------------- */
         function renderSearchView() {
             const container = document.getElementById('main-container');
@@ -3077,9 +3520,6 @@
             }
         }
 
-        /* -------------------------------------------------------------
-           フォロー / フォロワー機能 ＆ プロフィール編集関連（完全復活）
-        ------------------------------------------------------------- */
         async function toggleFollow(targetUid) {
             if (!currentUser) return;
             const myUid = currentUser.uid;
