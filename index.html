@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Life Trophies</title>
     
     <!-- PWA Settings -->
@@ -14,6 +17,11 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
 
+    <!-- Firebase SDK (Compat v10) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
     <style>
         :root {
             --bg-main: #000000;
@@ -21,23 +29,30 @@
             --surface-hover: #171717;
             --border-color: rgba(255, 255, 255, 0.12);
             --border-light: rgba(255, 255, 255, 0.25);
-            
             --text-primary: #ffffff;
             --text-secondary: #8e8e93;
             --text-tertiary: #48484a;
+            --accent-red: #ff2d55;
+            --nav-bg: rgba(0, 0, 0, 0.95);
+        }
 
-            --badge-plat: #ffffff;
-            --badge-gold: #d4d4d8;
-            --badge-silver: #a1a1aa;
-            --badge-bronze: #52525b;
+        body.light-mode {
+            --bg-main: #f2f2f7;
+            --surface-card: #ffffff;
+            --surface-hover: #e5e5ea;
+            --border-color: rgba(0, 0, 0, 0.1);
+            --border-light: rgba(0, 0, 0, 0.2);
+            --text-primary: #000000;
+            --text-secondary: #3a3a3c;
+            --text-tertiary: #8e8e93;
+            --accent-red: #ff3b30;
+            --nav-bg: rgba(255, 255, 255, 0.95);
         }
 
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            user-select: none;
-            -webkit-user-select: none;
             -webkit-tap-highlight-color: transparent;
         }
 
@@ -46,37 +61,78 @@
             color: var(--text-primary);
             font-family: 'Inter', 'Noto Sans JP', -apple-system, sans-serif;
             min-height: 100vh;
-            padding-bottom: 60px;
+            padding-bottom: 100px;
             overflow-x: hidden;
             -webkit-font-smoothing: antialiased;
+            transition: background-color 0.3s, color 0.3s;
         }
 
-        /* Minimal Header */
         header {
             position: sticky;
             top: 0;
-            z-index: 100;
-            background: rgba(0, 0, 0, 0.85);
+            z-index: 50;
+            background: var(--nav-bg);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
             border-bottom: 1px solid var(--border-color);
-            padding: 16px 20px;
-            padding-top: calc(16px + env(safe-area-inset-top));
+            padding: 14px 20px;
+            padding-top: calc(14px + env(safe-area-inset-top));
         }
 
         .header-top {
             display: flex;
             justify-content: space-between;
-            align-items: flex-end;
-            margin-bottom: 16px;
+            align-items: center;
+            margin-bottom: 10px;
         }
 
         .brand-logo {
             font-size: 1.1rem;
             font-weight: 900;
-            letter-spacing: 3px;
+            letter-spacing: 2px;
             text-transform: uppercase;
             color: var(--text-primary);
+            cursor: pointer;
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+        }
+
+        .version-badge {
+            font-size: 0.55rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            background: var(--surface-hover);
+            padding: 2px 5px;
+            border-radius: 4px;
+            letter-spacing: 0;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-icon-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-size: 1.1rem;
+            cursor: pointer;
+            position: relative;
+            padding: 6px;
+        }
+
+        .notif-badge-dot {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            width: 8px;
+            height: 8px;
+            background: var(--accent-red);
+            border-radius: 50%;
+            display: none;
         }
 
         .progress-stat {
@@ -91,16 +147,15 @@
             font-size: 1rem;
         }
 
-        /* Rank Counts Bar */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 6px;
-            margin-bottom: 14px;
+            margin-bottom: 4px;
         }
 
         .stat-badge {
-            background: rgba(255, 255, 255, 0.04);
+            background: var(--surface-card);
             border: 1px solid var(--border-color);
             border-radius: 8px;
             padding: 6px;
@@ -116,44 +171,137 @@
             margin-bottom: 2px;
         }
 
-        .stat-badge .rank-val {
-            font-size: 0.85rem;
-            font-weight: 700;
-        }
+        .stat-badge .rank-val { font-size: 0.85rem; font-weight: 700; color: var(--text-primary); }
 
-        /* Filter Navigation */
-        .filter-nav {
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 65px;
+            background: var(--nav-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-top: 1px solid var(--border-color);
             display: flex;
-            gap: 6px;
-            overflow-x: auto;
-            scrollbar-width: none;
+            justify-content: space-around;
+            align-items: center;
+            z-index: 100;
+            padding-bottom: env(safe-area-inset-bottom);
         }
 
-        .filter-nav::-webkit-scrollbar { display: none; }
-
-        .filter-btn {
-            background: transparent;
-            border: 1px solid var(--border-color);
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
             color: var(--text-secondary);
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 0.75rem;
+            font-size: 0.55rem;
             font-weight: 600;
-            white-space: nowrap;
-            transition: all 0.2s ease;
+            gap: 3px;
+            cursor: pointer;
+            flex: 1;
+            height: 100%;
+            background: transparent;
+            border: none;
+            outline: none;
         }
 
-        .filter-btn.active {
-            background: var(--text-primary);
-            color: var(--bg-main);
-            border-color: var(--text-primary);
-        }
+        .nav-item.active { color: var(--text-primary); }
+        .nav-item i { font-size: 1.2rem; pointer-events: none; }
 
-        /* Container & Cards */
         .container {
             padding: 16px 20px;
             max-width: 600px;
             margin: 0 auto;
+        }
+
+        .category-tabs {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            margin-bottom: 14px;
+            background: var(--surface-card);
+            padding: 4px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+        }
+
+        .category-tab-btn {
+            padding: 8px 4px;
+            border: none;
+            border-radius: 8px;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 0.72rem;
+            font-weight: 800;
+            cursor: pointer;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .category-tab-btn.active {
+            background: var(--text-primary);
+            color: var(--bg-main);
+        }
+
+        .profile-card-header {
+            background: var(--surface-card);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 18px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .profile-avatar-large {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: var(--surface-hover);
+            border: 1px solid var(--border-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            color: var(--text-secondary);
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+
+        .profile-info { flex-grow: 1; min-width: 0; }
+        .profile-displayname { font-size: 1rem; font-weight: 900; color: var(--text-primary); margin-bottom: 2px; }
+        .profile-username { font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; }
+        .profile-email-tag { font-size: 0.65rem; color: var(--text-tertiary); margin-bottom: 6px; word-break: break-all; }
+        .profile-bio { font-size: 0.75rem; color: var(--text-secondary); line-height: 1.3; margin-bottom: 8px; }
+
+        .follow-stats-row {
+            display: flex;
+            gap: 12px;
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+        .follow-stats-row div { cursor: pointer; }
+        .follow-stats-row span { font-weight: 700; color: var(--text-primary); }
+
+        .btn-action-small {
+            background: transparent;
+            border: 1px solid var(--border-light);
+            color: var(--text-primary);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .btn-action-small.following {
+            background: var(--surface-hover);
+            border-color: transparent;
         }
 
         .trophy-card {
@@ -164,27 +312,25 @@
             margin-bottom: 10px;
             display: flex;
             align-items: center;
-            gap: 16px;
-            transition: all 0.2s ease;
+            gap: 14px;
             position: relative;
         }
 
         .trophy-card.unlocked {
-            background: #121212;
+            background: var(--surface-card);
             border-color: var(--border-light);
         }
 
         .trophy-card.ultimate {
-            border: 1px solid rgba(255, 255, 255, 0.6);
-            box-shadow: inset 0 0 15px rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--text-primary);
+            box-shadow: inset 0 0 15px rgba(128, 128, 128, 0.05);
         }
 
-        /* Mono Trophy Icons */
         .icon-box {
             width: 44px;
             height: 44px;
             border-radius: 10px;
-            background: rgba(255, 255, 255, 0.03);
+            background: var(--surface-hover);
             border: 1px solid var(--border-color);
             display: flex;
             align-items: center;
@@ -192,57 +338,40 @@
             font-size: 1.1rem;
             color: var(--text-tertiary);
             flex-shrink: 0;
-            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+
+        .icon-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
         }
 
         .unlocked .icon-box {
             color: var(--text-primary);
-            background: rgba(255, 255, 255, 0.1);
-            border-color: rgba(255, 255, 255, 0.3);
+            background: var(--surface-hover);
+            border-color: var(--border-light);
         }
 
-        .trophy-info {
-            flex-grow: 1;
-        }
+        .trophy-info { flex-grow: 1; min-width: 0; }
+        .trophy-name { font-size: 0.9rem; font-weight: 700; margin-bottom: 3px; color: var(--text-primary); word-break: break-word; }
+        .trophy-card:not(.unlocked) .trophy-name { color: var(--text-secondary); }
+        .trophy-condition { font-size: 0.75rem; color: var(--text-secondary); line-height: 1.3; margin-bottom: 6px; word-break: break-word; }
 
-        .trophy-name {
-            font-size: 0.9rem;
-            font-weight: 700;
-            letter-spacing: 0.3px;
-            margin-bottom: 3px;
-            color: var(--text-primary);
-        }
-
-        .trophy-card:not(.unlocked) .trophy-name {
-            color: var(--text-secondary);
-        }
-
-        .trophy-condition {
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-            line-height: 1.3;
-            margin-bottom: 6px;
-        }
-
-        .trophy-meta {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
+        .trophy-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
         .rank-tag {
             font-size: 0.6rem;
             font-weight: 800;
             letter-spacing: 1px;
             padding: 2px 6px;
             border-radius: 4px;
-            background: rgba(255, 255, 255, 0.06);
+            background: var(--surface-hover);
             color: var(--text-secondary);
             text-transform: uppercase;
         }
 
         .unlocked-tag {
-            font-size: 0.65rem;
+            font-size: 0.62rem;
             color: var(--text-primary);
             font-weight: 600;
             display: flex;
@@ -254,198 +383,626 @@
             background: transparent;
             border: 1px solid var(--border-light);
             color: var(--text-primary);
-            padding: 8px 14px;
+            padding: 8px 12px;
             border-radius: 6px;
-            font-size: 0.75rem;
+            font-size: 0.72rem;
             font-weight: 700;
-            letter-spacing: 0.5px;
             cursor: pointer;
-            transition: all 0.2s ease;
+            white-space: nowrap;
         }
 
-        .unlock-btn:active {
-            background: var(--text-primary);
-            color: var(--bg-main);
+        .delete-btn {
+            background: rgba(255, 59, 48, 0.15);
+            border: 1px solid rgba(255, 59, 48, 0.3);
+            color: var(--accent-red);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            cursor: pointer;
+            white-space: nowrap;
         }
 
-        /* Sleek Modern Notification */
+        .card-actions-group {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .feed-card {
+            background: var(--surface-card);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .feed-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .feed-user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+        }
+
+        .feed-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--surface-hover);
+            object-fit: cover;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+        }
+
+        .feed-display-name { font-size: 0.85rem; font-weight: 800; color: var(--text-primary); }
+        .feed-user-name { font-size: 0.65rem; color: var(--text-secondary); }
+        .feed-time { font-size: 0.65rem; color: var(--text-secondary); }
+
+        .feed-trophy-banner {
+            background: var(--surface-hover);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+
+        .feed-photo {
+            width: 100%;
+            max-height: 250px;
+            object-fit: cover;
+            border-radius: 10px;
+            margin-bottom: 12px;
+            cursor: pointer;
+        }
+
+        .feed-comment-box {
+            font-size: 0.8rem;
+            color: var(--text-primary);
+            background: var(--surface-hover);
+            padding: 10px 12px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            line-height: 1.4;
+            word-break: break-word;
+        }
+
+        .feed-actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .feed-actions-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .feed-action-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+        .feed-action-btn.liked { color: var(--accent-red); }
+
+        .feed-comments-section {
+            margin-top: 12px;
+            padding-top: 10px;
+            border-top: 1px solid var(--border-color);
+        }
+        .comment-item { font-size: 0.75rem; margin-bottom: 6px; color: var(--text-secondary); }
+        .comment-item b { color: var(--text-primary); }
+
+        .comment-input-box {
+            display: flex;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .gallery-grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 4px;
+        }
+
+        .gallery-item {
+            aspect-ratio: 1;
+            position: relative;
+            overflow: hidden;
+            border-radius: 6px;
+            background: var(--surface-card);
+            cursor: pointer;
+        }
+
+        .gallery-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .gallery-item-title {
+            position: absolute;
+            bottom: 0;
+            inset-x: 0;
+            background: rgba(0,0,0,0.75);
+            font-size: 0.55rem;
+            padding: 3px 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: #fff;
+        }
+
+        .unlocked-manage-card {
+            background: var(--surface-hover);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .unlocked-manage-thumb {
+            width: 44px;
+            height: 44px;
+            border-radius: 6px;
+            object-fit: cover;
+            background: var(--surface-card);
+            flex-shrink: 0;
+        }
+
         #notification {
             position: fixed;
             top: calc(16px + env(safe-area-inset-top));
             left: 50%;
-            transform: translateX(-50%) translateY(-100px);
-            width: 90%;
+            transform: translateX(-50%) translateY(-120px);
+            width: 92%;
             max-width: 400px;
-            background: #ffffff;
-            color: #000000;
+            background: var(--text-primary);
+            color: var(--bg-main);
             border-radius: 12px;
             padding: 14px 18px;
             display: flex;
             align-items: center;
             gap: 14px;
-            box-shadow: 0 10px 30px rgba(255, 255, 255, 0.15);
-            z-index: 1000;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+            z-index: 3000;
             transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            pointer-events: none;
         }
 
-        #notification.show {
-            transform: translateX(-50%) translateY(0);
-        }
+        #notification.show { transform: translateX(-50%) translateY(0); }
+        .notif-icon { width: 36px; height: 36px; background: var(--bg-main); color: var(--text-primary); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
-        .notif-icon {
-            width: 36px;
-            height: 36px;
-            background: #000000;
-            color: #ffffff;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1rem;
-        }
-
-        .notif-text .label {
-            font-size: 0.6rem;
-            font-weight: 900;
-            letter-spacing: 1.5px;
-            text-transform: uppercase;
-            color: #666666;
-        }
-
-        .notif-text .title {
-            font-size: 0.85rem;
-            font-weight: 700;
-        }
-
-        /* Modal */
         .modal {
             display: none;
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, 0.9);
+            background: rgba(0, 0, 0, 0.85);
             backdrop-filter: blur(10px);
-            z-index: 500;
-            align-items: center;
-            justify-content: center;
+            z-index: 2000;
             padding: 20px;
         }
 
-        .modal.active { display: flex; }
+        .modal.active { display: flex; align-items: center; justify-content: center; }
 
         .modal-content {
-            background: #0d0d0d;
+            background: var(--surface-card);
             border: 1px solid var(--border-light);
             border-radius: 16px;
             width: 100%;
             max-width: 400px;
             padding: 24px;
+            color: var(--text-primary);
+            max-height: 85vh;
+            overflow-y: auto;
         }
 
-        .modal-title {
-            font-size: 1rem;
+        .modal-title { font-size: 1rem; font-weight: 700; margin-bottom: 16px; text-align: center; letter-spacing: 0.5px; }
+
+        .form-input {
+            width: 100%;
+            background: var(--surface-hover);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            margin-bottom: 12px;
+            outline: none;
+            user-select: text;
+            -webkit-user-select: text;
+        }
+
+        .form-input:focus { border-color: var(--text-primary); }
+
+        .form-textarea {
+            width: 100%;
+            background: var(--surface-hover);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            margin-bottom: 12px;
+            outline: none;
+            resize: none;
+            height: 80px;
+            font-family: inherit;
+            user-select: text;
+            -webkit-user-select: text;
+        }
+
+        .form-textarea:focus { border-color: var(--text-primary); }
+
+        .form-select {
+            width: 100%;
+            background: var(--surface-hover);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            margin-bottom: 12px;
+            outline: none;
+        }
+
+        .modal-btn {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: none;
+            font-size: 0.85rem;
             font-weight: 700;
-            margin-bottom: 16px;
-            letter-spacing: 0.5px;
+            cursor: pointer;
+            background: var(--text-primary);
+            color: var(--bg-main);
+            margin-top: 6px;
+        }
+
+        .modal-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         .photo-upload-zone {
-            border: 1px dashed var(--border-light);
+            border: 2px dashed var(--border-light);
             border-radius: 10px;
             padding: 24px;
             text-align: center;
             cursor: pointer;
             margin-bottom: 16px;
-            background: rgba(255, 255, 255, 0.02);
+            background: var(--surface-hover);
+            transition: border-color 0.2s;
         }
 
-        .photo-preview {
-            width: 100%;
-            max-height: 200px;
-            object-fit: cover;
-            border-radius: 8px;
-            display: none;
-            margin-bottom: 16px;
+        .photo-upload-zone.required-highlight {
+            border-color: var(--accent-red);
         }
 
-        .modal-buttons {
-            display: flex;
-            gap: 10px;
-        }
-
-        .modal-btn {
-            flex: 1;
-            padding: 12px;
-            border-radius: 8px;
-            border: none;
-            font-size: 0.8rem;
-            font-weight: 700;
-            cursor: pointer;
-        }
-
-        .btn-confirm { background: var(--text-primary); color: var(--bg-main); }
+        .photo-preview { width: 100%; max-height: 200px; object-fit: cover; border-radius: 8px; display: none; margin-bottom: 16px; }
+        .modal-buttons { display: flex; gap: 10px; margin-top: 10px; }
         .btn-cancel { background: transparent; border: 1px solid var(--border-color); color: var(--text-secondary); }
     </style>
 </head>
 <body>
 
+    <!-- Auth Modal -->
+    <div class="modal" id="auth-modal">
+        <div class="modal-content">
+            <div class="modal-title" id="auth-title">ログイン</div>
+            <form onsubmit="event.preventDefault(); handleAuth();" autocomplete="off">
+                <input type="email" id="auth-email" class="form-input" placeholder="メールアドレス" autocomplete="off">
+                <input type="password" id="auth-password" class="form-input" placeholder="パスワード (6文字以上)" autocomplete="new-password">
+                <button type="submit" class="modal-btn" id="auth-submit-btn">ログイン</button>
+            </form>
+            <div style="text-align:center; margin-top:14px; font-size:0.75rem; color:var(--text-secondary); cursor:pointer; padding:6px;" id="auth-switch-text" onclick="toggleAuthMode()">アカウントをお持ちでない方は新規登録</div>
+        </div>
+    </div>
+
+    <!-- Initial Profile Setup Modal -->
+    <div class="modal" id="username-modal">
+        <div class="modal-content">
+            <div class="modal-title">✨ プロフィール初期設定</div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 14px; text-align: center; line-height: 1.4;">
+                アカウント作成ありがとうございます！<br>検索やタイムラインで使用する<b>表示名</b>と<b>ユーザーID</b>を設定してください。
+            </div>
+            <div id="setup-email-display" style="font-size: 0.70rem; color: var(--text-secondary); background: var(--surface-hover); padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; text-align: center; word-break: break-all;"></div>
+            <input type="text" id="displayname-input" class="form-input" placeholder="表示名 (例: てるあき)">
+            <input type="text" id="username-input" class="form-input" placeholder="ユーザーID・半角英数 (例: HR_40)">
+            <input type="text" id="bio-input" class="form-input" placeholder="ステータスメッセージ (例: 人生の実績解除中！)">
+            <button type="button" class="modal-btn" id="save-initial-profile-btn" onclick="saveInitialProfile()">設定を完了して始める</button>
+            <button type="button" class="modal-btn btn-cancel" style="margin-top: 10px; font-size: 0.75rem;" onclick="logout()">別のアカウントでログインし直す</button>
+        </div>
+    </div>
+
+    <!-- Edit Profile Modal -->
+    <div class="modal" id="edit-profile-modal">
+        <div class="modal-content">
+            <div class="modal-title">プロフィールを編集</div>
+            <div class="photo-upload-zone" onclick="document.getElementById('avatar-input').click()">
+                <i class="fa-solid fa-camera" style="font-size: 1.5rem; color: var(--text-secondary); margin-bottom: 8px;"></i>
+                <div style="font-size: 0.75rem; color: var(--text-secondary);">アイコン画像を変更</div>
+            </div>
+            <img id="avatar-preview" class="photo-preview" alt="Avatar Preview">
+            <input type="file" id="avatar-input" accept="image/*" style="display: none;" onchange="previewAvatar(event)">
+            
+            <input type="text" id="edit-displayname-input" class="form-input" placeholder="表示名">
+            <input type="text" id="edit-username-input" class="form-input" placeholder="ユーザーID">
+            <input type="text" id="edit-bio-input" class="form-input" placeholder="ステータスメッセージ">
+            <div class="modal-buttons">
+                <button class="modal-btn btn-cancel" onclick="closeModal('edit-profile-modal')">キャンセル</button>
+                <button class="modal-btn" onclick="saveProfileChanges()">保存する</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal" id="settings-modal">
+        <div class="modal-content">
+            <div class="modal-title">⚙️ 設定</div>
+            
+            <div style="margin-bottom: 16px;">
+                <div style="font-size: 0.8rem; font-weight: 700; margin-bottom: 6px; color: var(--text-secondary);">外観テーマ</div>
+                <div style="display: flex; gap: 10px;">
+                    <button class="modal-btn" id="theme-dark-btn" onclick="setTheme('dark', true)" style="background: #222; color: #fff; border: 1px solid #444; margin-top:0;">ダーク</button>
+                    <button class="modal-btn" id="theme-light-btn" onclick="setTheme('light', true)" style="background: #f2f2f7; color: #000; border: 1px solid #ccc; margin-top:0;">ライト</button>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <div style="font-size: 0.8rem; font-weight: 700; margin-bottom: 6px; color: var(--text-secondary);">プライバシー設定</div>
+                <select id="privacy-select" class="form-select" onchange="savePrivacySetting(this.value)">
+                    <option value="public">全体公開 (誰でも実績閲覧可能)</option>
+                    <option value="followers">フォロワーのみ公開</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <div style="font-size: 0.8rem; font-weight: 700; margin-bottom: 6px; color: var(--text-secondary);">アカウント管理</div>
+                <button class="modal-btn" onclick="closeModal('settings-modal'); openEditProfileModal();" style="background: var(--surface-hover); color: var(--text-primary); border: 1px solid var(--border-color); margin-bottom: 6px;">プロフィール情報を編集</button>
+                <button class="modal-btn" onclick="recoverFromPosts(true)" style="background: var(--surface-hover); color: var(--text-primary); border: 1px solid var(--border-color); margin-bottom: 6px;">🔄 過去の実績データを復元する</button>
+                <button class="modal-btn" onclick="logout()" style="background: var(--surface-hover); color: var(--text-primary); border: 1px solid var(--border-color); margin-bottom: 6px;">ログアウト</button>
+                <button class="modal-btn" onclick="deleteAccount()" style="background: rgba(255,59,48,0.15); color: var(--accent-red); border: none;">アカウントを削除する</button>
+            </div>
+
+            <button class="modal-btn btn-cancel" onclick="closeModal('settings-modal')">閉じる</button>
+        </div>
+    </div>
+
+    <!-- Unlocked Achievements Management Modal -->
+    <div class="modal" id="unlocked-manage-modal">
+        <div class="modal-content">
+            <div class="modal-title">🔄 解除済み実績の管理</div>
+            <div style="font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 12px; text-align: center;">
+                これまでに解除した実績の確認や、未解除の状態へのリセット（取消）ができます。
+            </div>
+            <div id="unlocked-manage-list-container" style="margin-bottom: 16px; max-height: 50vh; overflow-y: auto;"></div>
+            <div class="modal-buttons">
+                <button class="modal-btn" onclick="recoverFromPosts(true)" style="background: var(--surface-hover); color: var(--text-primary); border: 1px solid var(--border-color); margin-top:0;">履歴から復元</button>
+                <button class="modal-btn btn-cancel" onclick="closeModal('unlocked-manage-modal')" style="margin-top:0;">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Photo Lightbox / Detail Zoom Modal -->
+    <div class="modal" id="photo-lightbox-modal" onclick="closeModal('photo-lightbox-modal')">
+        <div class="modal-content" onclick="event.stopPropagation()" style="text-align: center; max-width: 440px;">
+            <div class="modal-title" id="lightbox-title" style="margin-bottom: 10px; font-size: 0.95rem;">実績詳細</div>
+            <img id="lightbox-image" style="width: 100%; max-height: 320px; object-fit: cover; border-radius: 10px; margin-bottom: 12px;" alt="Zoomed Photo">
+            <div id="lightbox-condition" style="font-size: 0.75rem; color: var(--text-primary); background: var(--surface-hover); padding: 8px 12px; border-radius: 6px; margin-bottom: 8px; text-align: left; font-weight: 700;"></div>
+            <div id="lightbox-date" style="font-size: 0.7rem; color: var(--text-secondary); margin-bottom: 8px;"></div>
+            <div id="lightbox-comment" style="font-size: 0.85rem; background: var(--surface-hover); padding: 12px; border-radius: 8px; margin-bottom: 16px; text-align: left; line-height: 1.4; word-break: break-word;"></div>
+            
+            <div id="lightbox-delete-container" style="margin-bottom: 12px; display: none;">
+                <button class="delete-btn" id="lightbox-delete-post-btn" style="width: 100%; padding: 10px; font-size: 0.8rem;">🗑️ このタイムライン投稿を削除する</button>
+            </div>
+
+            <button class="modal-btn btn-cancel" onclick="closeModal('photo-lightbox-modal')">閉じる</button>
+        </div>
+    </div>
+
+    <!-- Follow / Follower List Modal -->
+    <div class="modal" id="follow-list-modal">
+        <div class="modal-content">
+            <div class="modal-title" id="follow-list-title">リスト</div>
+            <div id="follow-list-container" style="margin-bottom: 16px;"></div>
+            <button class="modal-btn btn-cancel" onclick="closeModal('follow-list-modal')">閉じる</button>
+        </div>
+    </div>
+
+    <!-- Notifications Modal -->
+    <div class="modal" id="notifications-modal">
+        <div class="modal-content">
+            <div class="modal-title">🔔 お知らせ</div>
+            <div id="notifications-container" style="margin-bottom: 16px;"></div>
+            <button class="modal-btn btn-cancel" onclick="closeModal('notifications-modal')">閉じる</button>
+        </div>
+    </div>
+
+    <!-- Custom Trophy Modal -->
+    <div class="modal" id="custom-trophy-modal">
+        <div class="modal-content">
+            <div class="modal-title">✨ カスタム実績を作成</div>
+            <input type="text" id="custom-title" class="form-input" placeholder="実績タイトル (例: 無限の彼方へ)">
+            <input type="text" id="custom-condition" class="form-input" placeholder="達成条件 (例: 空を飛ぶ)">
+            <select id="custom-rank" class="form-select">
+                <option value="bronze">BRONZE</option>
+                <option value="silver">SILVER</option>
+                <option value="gold">GOLD</option>
+                <option value="platinum">PLATINUM</option>
+            </select>
+            <div class="modal-buttons">
+                <button class="modal-btn btn-cancel" onclick="closeModal('custom-trophy-modal')">キャンセル</button>
+                <button class="modal-btn" onclick="addCustomTrophy()">作成する</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Circle Modal (サークル立ち上げ) -->
+    <div class="modal" id="create-circle-modal">
+        <div class="modal-content">
+            <div class="modal-title">⭕ サークルを立ち上げる</div>
+            <input type="text" id="circle-name-input" class="form-input" placeholder="サークル名 (例: 週末エンジニア部)">
+            <textarea id="circle-bio-input" class="form-textarea" placeholder="サークル自己紹介 (例: 一緒に新しいサービスを作ろう！)"></textarea>
+            <div class="modal-buttons">
+                <button class="modal-btn btn-cancel" onclick="closeModal('create-circle-modal')">キャンセル</button>
+                <button class="modal-btn" onclick="createCircle()">立ち上げる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Circle Trophy Modal (サークル実績作成) -->
+    <div class="modal" id="circle-trophy-modal">
+        <div class="modal-content">
+            <div class="modal-title">⭕ サークル実績を作成</div>
+            <input type="text" id="circle-trophy-title" class="form-input" placeholder="実績タイトル (例: 初プルリク達成)">
+            <input type="text" id="circle-trophy-condition" class="form-input" placeholder="達成条件 (例: GitHubにPRを送る)">
+            <select id="circle-trophy-rank" class="form-select">
+                <option value="bronze">BRONZE</option>
+                <option value="silver">SILVER</option>
+                <option value="gold">GOLD</option>
+                <option value="platinum">PLATINUM</option>
+            </select>
+            <div class="modal-buttons">
+                <button class="modal-btn btn-cancel" onclick="closeModal('circle-trophy-modal')">キャンセル</button>
+                <button class="modal-btn" onclick="addCircleTrophy()">作成する</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Unlock Modal -->
+    <div class="modal" id="unlock-modal">
+        <div class="modal-content">
+            <div class="modal-title" id="modal-trophy-title">実績を解除</div>
+            <div class="photo-upload-zone" id="unlock-photo-zone" onclick="document.getElementById('photo-input').click()">
+                <i class="fa-solid fa-camera" style="font-size: 1.5rem; color: var(--text-secondary); margin-bottom: 8px;"></i>
+                <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-primary);" id="photo-upload-label">📸 証拠写真を撮影・選択 (必須)</div>
+                <div style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 4px;">※写真を添付しないと解除できません</div>
+            </div>
+            <img id="photo-preview" class="photo-preview" alt="Preview">
+            <input type="file" id="photo-input" accept="image/*" style="display: none;" onchange="previewImage(event)">
+            
+            <textarea id="unlock-comment-input" class="form-textarea" placeholder="思い出や感想のコメントを残す（任意）"></textarea>
+
+            <div class="modal-buttons">
+                <button class="modal-btn btn-cancel" onclick="closeModal('unlock-modal')">キャンセル</button>
+                <button class="modal-btn" id="confirm-unlock-btn" onclick="confirmUnlock()">解除する</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header -->
     <header>
         <div class="header-top">
-            <div class="brand-logo">Life Trophies</div>
-            <div class="progress-stat">PROGRESS <span id="progress-percent">0%</span></div>
+            <div class="brand-logo" onclick="switchMainTab('trophies')">
+                Life Trophies <span class="version-badge">v5.1</span>
+            </div>
+            <div class="header-right">
+                <button class="header-icon-btn" onclick="openNotificationsModal()">
+                    <i class="fa-solid fa-bell"></i>
+                    <div class="notif-badge-dot" id="notif-badge-dot"></div>
+                </button>
+                <div class="progress-stat">PROGRESS <span id="progress-percent">0%</span></div>
+            </div>
         </div>
 
-        <div class="stats-grid">
+        <div class="stats-grid" id="stats-grid-box">
             <div class="stat-badge"><span class="rank-label">PLATINUM</span><span class="rank-val" id="count-plat">0</span></div>
             <div class="stat-badge"><span class="rank-label">GOLD</span><span class="rank-val" id="count-gold">0</span></div>
             <div class="stat-badge"><span class="rank-label">SILVER</span><span class="rank-val" id="count-silver">0</span></div>
             <div class="stat-badge"><span class="rank-label">BRONZE</span><span class="rank-val" id="count-bronze">0</span></div>
         </div>
-
-        <div class="filter-nav">
-            <button class="filter-btn active" onclick="filterTrophies('all')">ALL</button>
-            <button class="filter-btn" onclick="filterTrophies('unlocked')">UNLOCKED</button>
-            <button class="filter-btn" onclick="filterTrophies('platinum')">PLATINUM</button>
-            <button class="filter-btn" onclick="filterTrophies('gold')">GOLD</button>
-            <button class="filter-btn" onclick="filterTrophies('silver')">SILVER</button>
-            <button class="filter-btn" onclick="filterTrophies('bronze')">BRONZE</button>
-        </div>
     </header>
 
-    <div class="container" id="trophy-list"></div>
+    <div class="container" id="main-container"></div>
 
-    <div id="notification">
-        <div class="notif-icon">
+    <!-- 5タブ構成のボトムナビゲーションバー -->
+    <nav class="bottom-nav">
+        <button class="nav-item" id="nav-btn-feed" onclick="switchMainTab('feed')">
+            <i class="fa-solid fa-house"></i>
+            <span>ホーム</span>
+        </button>
+        <button class="nav-item active" id="nav-btn-trophies" onclick="switchMainTab('trophies')">
             <i class="fa-solid fa-trophy"></i>
-        </div>
-        <div class="notif-text">
-            <div class="label">Trophy Unlocked</div>
-            <div class="title" id="notif-title">実績タイトル</div>
-        </div>
-    </div>
+            <span>実績</span>
+        </button>
+        <button class="nav-item" id="nav-btn-circle" onclick="switchMainTab('circle')">
+            <i class="fa-solid fa-circle-nodes"></i>
+            <span>サークル</span>
+        </button>
+        <button class="nav-item" id="nav-btn-search" onclick="switchMainTab('search')">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <span>検索</span>
+        </button>
+        <button class="nav-item" id="nav-btn-profile" onclick="switchMainTab('profile')">
+            <i class="fa-solid fa-user"></i>
+            <span>マイページ</span>
+        </button>
+    </nav>
 
-    <div class="modal" id="unlock-modal">
-        <div class="modal-content">
-            <div class="modal-title" id="modal-trophy-title">実績を解除</div>
-            <div class="photo-upload-zone" onclick="document.getElementById('photo-input').click()">
-                <i class="fa-solid fa-camera" style="font-size: 1.5rem; color: var(--text-secondary); margin-bottom: 8px;"></i>
-                <div style="font-size: 0.75rem; color: var(--text-secondary);">記録写真を添付 (任意)</div>
-            </div>
-            <img id="photo-preview" class="photo-preview" alt="Preview">
-            <input type="file" id="photo-input" accept="image/*" capture="environment" style="display: none;" onchange="previewImage(event)">
-            
-            <div class="modal-buttons">
-                <button class="modal-btn btn-cancel" onclick="closeModal()">キャンセル</button>
-                <button class="modal-btn btn-confirm" onclick="confirmUnlock()">解除する</button>
-            </div>
+    <!-- Popup Notification -->
+    <div id="notification">
+        <div class="notif-icon"><i class="fa-solid fa-trophy"></i></div>
+        <div class="notif-text">
+            <div id="notif-subtitle" style="font-size: 0.6rem; font-weight: 900; color: var(--text-secondary); text-transform: uppercase;">SYSTEM NOTIFICATION</div>
+            <div class="title" id="notif-title" style="font-size: 0.85rem; font-weight: 700;">通知メッセージ</div>
         </div>
     </div>
 
     <script>
-        const defaultTrophies = [
-            // PLATINUM (1項目)
-            { id: 1, name: '夢、叶えし者', condition: '夢を叶える', rank: 'platinum', isUltimate: true },
+        const firebaseConfig = {
+            apiKey: "AIzaSyCYxWPvgUwPABCmvZyEZ_AXI-Q_yiDUlsg",
+            authDomain: "dreamscometrue-45b45.firebaseapp.com",
+            projectId: "dreamscometrue-45b45",
+            storageBucket: "dreamscometrue-45b45.firebasestorage.app",
+            messagingSenderId: "913187912196",
+            appId: "1:913187912196:web:e2739facf7420836ee9351",
+            measurementId: "G-YCH8JM2YCW"
+        };
 
-            // GOLD (16項目)
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        let currentUser = null;
+        let userState = {};
+        let myProfile = { uid: "", email: "", displayName: "", username: "", bio: "", avatar: "", theme: "dark", privacy: "public", following: [], followers: [], joinedCircles: [] };
+        let customTrophies = [];
+        let circleTrophies = [];
+        let activeCircles = [];
+        let currentActiveCircleId = null;
+        let revertedIds = [];
+        let isSignUpMode = false;
+        let isAuthProcessing = false;
+        let selectedTrophyId = null;
+        let activeTab = 'trophies';
+        let boardCategory = 'default';
+        let trophyFilter = 'all';
+        let tempAvatarBase64 = "";
+        let tempUnlockPhotoBase64 = "";
+        let notifTimer = null;
+
+        const defaultTrophies = [
+            { id: 1, name: '夢、叶えし者', condition: '夢を叶える', rank: 'platinum', isUltimate: true },
             { id: 2, name: 'バイリンガル', condition: 'TOEICで満点を取る', rank: 'gold' },
             { id: 3, name: '言語学者', condition: '漢検一級を取得', rank: 'gold' },
             { id: 4, name: 'Off the wall', condition: 'ベンチプレス100kgをクリア', rank: 'gold' },
@@ -462,8 +1019,6 @@
             { id: 15, name: 'Bullet', condition: '日帰りまたは0泊で海外へ行く', rank: 'gold' },
             { id: 16, name: '本物の勝負師', condition: '合法的なカジノで遊ぶ', rank: 'gold' },
             { id: 17, name: 'ダイヤモンドは砕けない', condition: 'ダイヤモンド製品を購入する', rank: 'gold' },
-
-            // SILVER (24項目)
             { id: 18, name: 'スティールボールラン', condition: '馬に乗る', rank: 'silver' },
             { id: 19, name: 'なにわの商人', condition: '家電量販店で値引きを交渉をして割引をしてもらう', rank: 'silver' },
             { id: 20, name: 'デジタルデトックス', condition: '見知らぬ人に教えを請う', rank: 'silver' },
@@ -488,8 +1043,6 @@
             { id: 39, name: 'この日のために', condition: '大勢の前でダンスを披露する', rank: 'silver' },
             { id: 40, name: '拡散よろしく！', condition: 'イベントでコスプレをする', rank: 'silver' },
             { id: 41, name: 'のんびりスローライフ', condition: '無人島に上陸する', rank: 'silver' },
-
-            // BRONZE (37項目)
             { id: 42, name: 'あの夏の思い出', condition: 'カブト虫を捕まえる', rank: 'bronze' },
             { id: 43, name: '秘密のストライク', condition: 'ボウリングでストライクを取る', rank: 'bronze' },
             { id: 44, name: 'ブルズアイ', condition: 'ダーツでブルに入れる', rank: 'bronze' },
@@ -529,117 +1082,2127 @@
             { id: 78, name: '恥知らずの', condition: '旅行に置いて行かれる', rank: 'bronze' }
         ];
 
-        let userState = JSON.parse(localStorage.getItem('life_trophies_v_mono')) || {};
-        let selectedTrophyId = null;
+        function withTimeout(promise, ms = 2000) {
+            return Promise.race([
+                promise,
+                new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), ms))
+            ]);
+        }
 
-        function renderTrophies(filter = 'all') {
-            const listEl = document.getElementById('trophy-list');
-            listEl.innerHTML = '';
+        function compressImageFile(file, maxSize, quality) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    const img = new Image();
+                    img.onload = function() {
+                        let width = img.width;
+                        let height = img.height;
+                        if (width > height) {
+                            if (width > maxSize) {
+                                height = Math.round(height * (maxSize / width));
+                                width = maxSize;
+                            }
+                        } else {
+                            if (height > maxSize) {
+                                width = Math.round(width * (maxSize / height));
+                                height = maxSize;
+                            }
+                        }
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        resolve(canvas.toDataURL('image/jpeg', quality));
+                    };
+                    img.onerror = reject;
+                    img.src = evt.target.result;
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function saveProfileToLocalCache(uid, profileObj) {
+            if (!uid) return;
+            try {
+                localStorage.setItem(`lt_profile_${uid}`, JSON.stringify(profileObj));
+            } catch (e) {}
+        }
+
+        function getProfileFromLocalCache(uid) {
+            if (!uid) return null;
+            try {
+                const s = localStorage.getItem(`lt_profile_${uid}`);
+                return s ? JSON.parse(s) : null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function syncProfileToCloudBackground(uid, profileData) {
+            if (!uid) return;
+            try {
+                db.collection('users').doc(uid).set(profileData, { merge: true }).catch(() => {});
+                db.collection('posts').doc('profile_' + uid).set({
+                    isProfileIndex: true,
+                    uid: uid,
+                    email: profileData.email || "",
+                    displayName: profileData.displayName || profileData.username,
+                    username: profileData.username,
+                    searchUsername: (profileData.username || "").toLowerCase(),
+                    bio: profileData.bio || "人生の実績解除中！",
+                    userAvatar: profileData.avatar || "",
+                    customTrophies: customTrophies || [],
+                    joinedCircles: myProfile.joinedCircles || [],
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true }).catch(() => {});
+            } catch (e) {}
+        }
+
+        async function saveCustomTrophiesToStorage() {
+            if (!currentUser) return;
+            const uid = currentUser.uid;
+            try {
+                localStorage.setItem(`lt_custom_${uid}`, JSON.stringify(customTrophies));
+                db.collection('users').doc(uid).set({ customTrophies: customTrophies }, { merge: true }).catch(()=>{});
+                db.collection('users').doc(uid).collection('trophies').doc('custom').set({ items: customTrophies }).catch(()=>{});
+                syncProfileToCloudBackground(uid, myProfile);
+            } catch (e) {}
+        }
+
+        async function saveSingleUnlockToStorage(trophyId, unlockData) {
+            if (!currentUser) return;
+            const uid = currentUser.uid;
+            const key = String(trophyId);
+            revertedIds = revertedIds.filter(id => String(id) !== key);
+            try {
+                localStorage.setItem(`lt_reverted_${uid}`, JSON.stringify(revertedIds));
+                localStorage.setItem(`lt_status_${uid}`, JSON.stringify(userState));
+                db.collection('users').doc(uid).collection('unlocked_items').doc(key).set(unlockData).catch(()=>{});
+                db.collection('users').doc(uid).collection('trophies').doc('status').set({ [key]: unlockData }, { merge: true }).catch(()=>{});
+            } catch (e) {}
+        }
+
+        async function removeSingleUnlockFromStorage(trophyId) {
+            if (!currentUser) return;
+            const uid = currentUser.uid;
+            const key = String(trophyId);
+            if (!revertedIds.includes(key)) revertedIds.push(key);
+            try {
+                localStorage.setItem(`lt_reverted_${uid}`, JSON.stringify(revertedIds));
+                localStorage.setItem(`lt_status_${uid}`, JSON.stringify(userState));
+                db.collection('users').doc(uid).collection('unlocked_items').doc(key).delete().catch(()=>{});
+                db.collection('users').doc(uid).collection('trophies').doc('status').update({
+                    [key]: firebase.firestore.FieldValue.delete()
+                }).catch(()=>{});
+            } catch (e) {}
+
+            try {
+                const postsSnap = await db.collection('posts').where('uid', '==', uid).get();
+                if (postsSnap && !postsSnap.empty) {
+                    const batch = db.batch();
+                    let count = 0;
+                    postsSnap.forEach(doc => {
+                        const p = doc.data();
+                        if (String(p.trophyId) === String(key)) {
+                            batch.delete(doc.ref);
+                            count++;
+                        }
+                    });
+                    if (count > 0) await batch.commit();
+                }
+            } catch (e) {}
+        }
+
+        async function deletePostByPostId(postId, trophyId) {
+            if (!currentUser || !postId) return;
+            if (!confirm('このタイムライン投稿を削除しますか？')) return;
+
+            try {
+                await db.collection('posts').doc(postId).delete();
+                if (trophyId && userState[trophyId]) {
+                    delete userState[trophyId];
+                    await removeSingleUnlockFromStorage(trophyId);
+                }
+
+                closeModal('photo-lightbox-modal');
+                switchMainTab(activeTab);
+                showNotification('タイムライン投稿を削除しました', 'POST DELETED');
+            } catch (e) {
+                alert('投稿の削除に失敗しました: ' + e.message);
+            }
+        }
+
+        auth.onAuthStateChanged(async user => {
+            try {
+                if (user) {
+                    currentUser = user;
+                    closeModal('auth-modal');
+                    await checkProfileAndLoad();
+                    checkUnreadNotifications();
+                } else {
+                    currentUser = null;
+                    userState = {};
+                    customTrophies = [];
+                    circleTrophies = [];
+                    activeCircles = [];
+                    myProfile = { uid: "", email: "", displayName: "", username: "", bio: "", avatar: "", theme: "dark", privacy: "public", following: [], followers: [], joinedCircles: [] };
+                    setTheme("dark", false);
+                    closeModal('username-modal');
+                    openModal('auth-modal');
+                    switchMainTab('trophies');
+                }
+            } catch (err) {
+                switchMainTab('trophies');
+            }
+        });
+
+        async function checkProfileAndLoad() {
+            if (!currentUser) return;
+            const uid = currentUser.uid;
+            const email = currentUser.email || "";
+
+            const cachedProfile = getProfileFromLocalCache(uid);
+            if (cachedProfile && cachedProfile.username && String(cachedProfile.username).trim() !== "") {
+                myProfile = Object.assign({}, myProfile, cachedProfile, { uid, email });
+                setTheme(myProfile.theme || "dark", false);
+                closeModal('username-modal');
+            }
+
+            let firestoreData = null;
+            try {
+                const userDoc = await withTimeout(db.collection('users').doc(uid).get(), 2000);
+                if (userDoc && userDoc.exists) {
+                    firestoreData = userDoc.data();
+                }
+            } catch (e) {}
+
+            if (!firestoreData || !firestoreData.username) {
+                try {
+                    const idxDoc = await withTimeout(db.collection('posts').doc('profile_' + uid).get(), 1500);
+                    if (idxDoc && idxDoc.exists && idxDoc.data().username) {
+                        const d = idxDoc.data();
+                        firestoreData = Object.assign({}, firestoreData || {}, {
+                            displayName: d.displayName,
+                            username: d.username,
+                            bio: d.bio,
+                            avatar: d.userAvatar,
+                            customTrophies: d.customTrophies || [],
+                            joinedCircles: d.joinedCircles || []
+                        });
+                    }
+                } catch (e) {}
+            }
+
+            const validUsername = (firestoreData && firestoreData.username && String(firestoreData.username).trim() !== "")
+                ? String(firestoreData.username).trim()
+                : (cachedProfile && cachedProfile.username && String(cachedProfile.username).trim() !== "" ? String(cachedProfile.username).trim() : "");
+
+            if (validUsername !== "") {
+                const source = Object.assign({}, cachedProfile || {}, firestoreData || {});
+                myProfile = {
+                    uid: uid,
+                    email: email,
+                    displayName: source.displayName || validUsername,
+                    username: validUsername,
+                    bio: source.bio || "人生の実績解除中！",
+                    avatar: source.avatar || "",
+                    theme: source.theme || "dark",
+                    privacy: source.privacy || "public",
+                    following: Array.isArray(source.following) ? source.following : [],
+                    followers: Array.isArray(source.followers) ? source.followers : [],
+                    joinedCircles: Array.isArray(source.joinedCircles) ? source.joinedCircles : []
+                };
+
+                saveProfileToLocalCache(uid, myProfile);
+                setTheme(myProfile.theme, false);
+                const privSelect = document.getElementById('privacy-select');
+                if (privSelect) privSelect.value = myProfile.privacy;
+
+                syncProfileToCloudBackground(uid, myProfile);
+                closeModal('username-modal');
+                await loadUserData(firestoreData);
+            } else {
+                await loadUserData(firestoreData);
+                openInitialProfileSetupModal();
+            }
+        }
+
+        function openInitialProfileSetupModal() {
+            if (!currentUser) return;
+            const emailDisp = document.getElementById('setup-email-display');
+            if (emailDisp) {
+                emailDisp.innerText = `登録メールアドレス: ${currentUser.email || '確認済'}`;
+            }
+            document.getElementById('displayname-input').value = myProfile.displayName || '';
+            document.getElementById('username-input').value = myProfile.username || '';
+            document.getElementById('bio-input').value = myProfile.bio || '';
+            openModal('username-modal');
+        }
+
+        function saveInitialProfile() {
+            const user = currentUser || auth.currentUser;
+            if (!user) {
+                closeModal('username-modal');
+                openModal('auth-modal');
+                return;
+            }
+
+            const displayName = document.getElementById('displayname-input').value.trim();
+            const username = document.getElementById('username-input').value.trim().replace(/^@/, '');
+            const bio = document.getElementById('bio-input').value.trim() || "人生の実績解除中！";
+
+            if (!displayName) return alert('表示名を入力してください');
+            if (!username) return alert('ユーザーIDを入力してください');
+
+            const uid = user.uid;
+            const email = user.email || "";
+
+            const profileData = {
+                uid: uid,
+                email: email,
+                displayName: displayName,
+                username: username,
+                searchUsername: username.toLowerCase(),
+                bio: bio,
+                avatar: myProfile.avatar || "",
+                theme: myProfile.theme || "dark",
+                privacy: myProfile.privacy || "public",
+                following: myProfile.following || [],
+                followers: myProfile.followers || [],
+                customTrophies: customTrophies || [],
+                joinedCircles: myProfile.joinedCircles || [],
+                updatedAt: new Date().toISOString()
+            };
+
+            myProfile = Object.assign({}, profileData);
+            saveProfileToLocalCache(uid, myProfile);
+
+            closeModal('username-modal');
+            switchMainTab('profile');
+            showNotification(`ようこそ、${displayName} (@${username}) さん！`, 'PROFILE COMPLETED');
+
+            syncProfileToCloudBackground(uid, profileData);
+        }
+
+        function toggleAuthMode() {
+            isSignUpMode = !isSignUpMode;
+            document.getElementById('auth-title').innerText = isSignUpMode ? '新規アカウント登録' : 'ログイン';
+            document.getElementById('auth-submit-btn').innerText = isSignUpMode ? '登録する' : 'ログイン';
+            document.getElementById('auth-switch-text').innerText = isSignUpMode ? 'すでにアカウントをお持ちの方はログイン' : 'アカウントをお持ちでない方は新規登録';
+        }
+
+        async function handleAuth() {
+            if (isAuthProcessing) return;
+
+            const emailInput = document.getElementById('auth-email');
+            const passInput = document.getElementById('auth-password');
+            const submitBtn = document.getElementById('auth-submit-btn');
+
+            const email = emailInput.value.trim();
+            const password = passInput.value;
+
+            if (!email || !password) {
+                return alert('メールアドレスとパスワードを入力してください');
+            }
+            if (password.length < 6) {
+                return alert('パスワードは6文字以上で入力してください');
+            }
+
+            isAuthProcessing = true;
+            submitBtn.disabled = true;
+            submitBtn.innerText = '認証中...';
+
+            try {
+                if (isSignUpMode) {
+                    const cred = await auth.createUserWithEmailAndPassword(email, password);
+                    currentUser = cred.user;
+                    closeModal('auth-modal');
+                    openInitialProfileSetupModal();
+                } else {
+                    await auth.signInWithEmailAndPassword(email, password);
+                }
+            } catch (error) {
+                if (isSignUpMode && error.code === 'auth/email-already-in-use') {
+                    try {
+                        await auth.signInWithEmailAndPassword(email, password);
+                        return;
+                    } catch (signInErr) {
+                        alert(`メールアドレス「${email}」は既に登録されています。\nログイン画面に切り替えますので、設定したパスワードでログインしてください。`);
+                        isSignUpMode = false;
+                        document.getElementById('auth-title').innerText = 'ログイン';
+                        document.getElementById('auth-submit-btn').innerText = 'ログイン';
+                        document.getElementById('auth-switch-text').innerText = 'アカウントをお持ちでない方は新規登録';
+                    }
+                } else {
+                    let msg = error.message;
+                    if (error.code === 'auth/weak-password') {
+                        msg = 'パスワードは6文字以上で入力してください。';
+                    } else if (error.code === 'auth/invalid-email') {
+                        msg = 'メールアドレスの形式が正しくありません。';
+                    } else if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+                        msg = 'メールアドレスまたはパスワードが間違っています。（未登録の場合は下のリンクから新規登録してください）';
+                    }
+                    alert('認証エラー: ' + msg);
+                }
+            } finally {
+                isAuthProcessing = false;
+                submitBtn.disabled = false;
+                submitBtn.innerText = isSignUpMode ? '登録する' : 'ログイン';
+            }
+        }
+
+        async function logout() {
+            closeModal('settings-modal');
+            closeModal('username-modal');
+            await auth.signOut();
+        }
+
+        async function deleteAccount() {
+            if (!confirm('本当にアカウントを削除しますか？\n作成したカスタム実績、タイムライン投稿、フォロー関係などすべてのデータが完全に削除され、元に戻せません。')) return;
+            
+            const user = currentUser || auth.currentUser;
+            if (!user) return;
+            const uid = user.uid;
+
+            try {
+                const postsSnap = await db.collection('posts').where('uid', '==', uid).get();
+                if (!postsSnap.empty) {
+                    const batch = db.batch();
+                    postsSnap.forEach(doc => batch.delete(doc.ref));
+                    await batch.commit();
+                }
+
+                await db.collection('users').doc(uid).delete().catch(()=>{});
+
+                localStorage.removeItem(`lt_profile_${uid}`);
+                localStorage.removeItem(`lt_custom_${uid}`);
+                localStorage.removeItem(`lt_status_${uid}`);
+                localStorage.removeItem(`lt_reverted_${uid}`);
+
+                await user.delete();
+                alert('アカウントおよび関連データを完全に削除しました。');
+            } catch (error) {
+                alert('エラー: セキュリティ保護のため、一度ログアウトして再ログインしてから削除を実行してください (' + error.message + ')');
+            }
+        }
+
+        async function loadUserData(userDocData) {
+            if (!currentUser) return;
+            const uid = currentUser.uid;
+
+            let mergedStatus = {};
+            let mergedCustom = [];
+
+            try {
+                const revStr = localStorage.getItem(`lt_reverted_${uid}`);
+                revertedIds = revStr ? JSON.parse(revStr) : [];
+            } catch (e) {
+                revertedIds = [];
+            }
+
+            try {
+                const localStatusStr = localStorage.getItem(`lt_status_${uid}`);
+                if (localStatusStr) Object.assign(mergedStatus, JSON.parse(localStatusStr));
+                const localCustomStr = localStorage.getItem(`lt_custom_${uid}`);
+                if (localCustomStr) mergedCustom = JSON.parse(localCustomStr);
+            } catch (e) {}
+
+            if (userDocData) {
+                if (userDocData.trophyStatus) Object.assign(mergedStatus, userDocData.trophyStatus);
+                if (Array.isArray(userDocData.customTrophies) && userDocData.customTrophies.length > mergedCustom.length) {
+                    mergedCustom = userDocData.customTrophies;
+                }
+                if (Array.isArray(userDocData.joinedCircles)) {
+                    myProfile.joinedCircles = userDocData.joinedCircles;
+                }
+            }
+
+            userState = mergedStatus;
+            customTrophies = mergedCustom;
+            switchMainTab(activeTab);
+
+            try {
+                const statusDoc = await withTimeout(db.collection('users').doc(uid).collection('trophies').doc('status').get(), 2000);
+                if (statusDoc && statusDoc.exists && statusDoc.data()) Object.assign(userState, statusDoc.data());
+            } catch (e) {}
+
+            try {
+                const customDoc = await withTimeout(db.collection('users').doc(uid).collection('trophies').doc('custom').get(), 2000);
+                if (customDoc && customDoc.exists && customDoc.data() && Array.isArray(customDoc.data().items)) {
+                    if (customDoc.data().items.length > customTrophies.length) customTrophies = customDoc.data().items;
+                }
+            } catch (e) {}
+
+            try {
+                const unlockedSnap = await withTimeout(db.collection('users').doc(uid).collection('unlocked_items').get(), 2000);
+                if (unlockedSnap) {
+                    unlockedSnap.forEach(doc => { userState[doc.id] = doc.data(); });
+                }
+            } catch (e) {}
+
+            recoverFromPosts(false);
+            switchMainTab(activeTab);
+        }
+
+        async function recoverFromPosts(isManualClick = false) {
+            if (!currentUser) return;
+            const uid = currentUser.uid;
+            let recoveredCount = 0;
+
+            try {
+                const postsSnap = await withTimeout(db.collection('posts').where('uid', '==', uid).get(), 2500);
+                postsSnap.forEach(doc => {
+                    const post = doc.data();
+                    if (post.isProfileIndex || post.isCircleDoc) return;
+                    let tId = post.trophyId;
+
+                    if (!tId && post.trophyName) {
+                        const matched = [...defaultTrophies, ...customTrophies].find(t => t.name === post.trophyName);
+                        if (matched) tId = matched.id;
+                    }
+
+                    if (tId !== undefined && tId !== null) {
+                        const key = String(tId);
+                        if (!userState[key] && !revertedIds.includes(key)) {
+                            userState[key] = {
+                                date: post.date || '復元済',
+                                photo: post.photo || null,
+                                comment: post.comment || '',
+                                condition: post.condition || '',
+                                trophyName: post.trophyName || ''
+                            };
+                            recoveredCount++;
+                        }
+
+                        if (key.startsWith('custom_') && !customTrophies.find(t => String(t.id) === key)) {
+                            customTrophies.push({
+                                id: key,
+                                name: post.trophyName || 'カスタム実績',
+                                condition: post.condition || 'タイムライン履歴から復元',
+                                rank: 'gold',
+                                isCustom: true
+                            });
+                        }
+                    }
+                });
+
+                if (recoveredCount > 0) {
+                    localStorage.setItem(`lt_status_${uid}`, JSON.stringify(userState));
+                    localStorage.setItem(`lt_custom_${uid}`, JSON.stringify(customTrophies));
+                    for (const [k, v] of Object.entries(userState)) {
+                        db.collection('users').doc(uid).collection('unlocked_items').doc(String(k)).set(v).catch(()=>{});
+                    }
+                    saveCustomTrophiesToStorage();
+                    switchMainTab(activeTab);
+                    showNotification(`${recoveredCount}件の実績データをタイムライン履歴から復元しました！`, 'DATA RECOVERED');
+                } else if (isManualClick) {
+                    alert('タイムライン履歴を確認しましたが、追加で復元できる過去の実績データはありませんでした。');
+                }
+            } catch (e) {
+                if (isManualClick) alert('復元スキャン中にエラーが発生しました: ' + e.message);
+            }
+        }
+
+        function switchMainTab(tab) {
+            activeTab = tab;
+            document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
+            const activeBtn = document.getElementById(`nav-btn-${tab}`);
+            if (activeBtn) activeBtn.classList.add('active');
+
+            const statsBox = document.getElementById('stats-grid-box');
+            if (statsBox) {
+                if (tab === 'trophies' || tab === 'other-profile') {
+                    statsBox.style.display = 'grid';
+                } else {
+                    statsBox.style.display = 'none';
+                }
+            }
+
+            if (tab === 'trophies') renderTrophiesView();
+            else if (tab === 'feed') renderFeedView();
+            else if (tab === 'circle') renderCircleView();
+            else if (tab === 'search') renderSearchView();
+            else if (tab === 'profile') renderMyProfileView();
+        }
+
+        function getAllTrophies() {
+            return [...defaultTrophies, ...customTrophies, ...circleTrophies];
+        }
+
+        function setTheme(themeName, shouldSaveToDb = false) {
+            myProfile.theme = themeName;
+            if (themeName === 'light') {
+                document.body.classList.add('light-mode');
+            } else {
+                document.body.classList.remove('light-mode');
+            }
+
+            if (shouldSaveToDb && currentUser) {
+                saveProfileToLocalCache(currentUser.uid, myProfile);
+                db.collection('users').doc(currentUser.uid).set({ theme: themeName }, { merge: true }).catch(()=>{});
+            }
+        }
+
+        function savePrivacySetting(privacyVal) {
+            myProfile.privacy = privacyVal;
+            if (currentUser) {
+                saveProfileToLocalCache(currentUser.uid, myProfile);
+                db.collection('users').doc(currentUser.uid).set({ privacy: privacyVal }, { merge: true }).catch(()=>{});
+            }
+            showNotification('プライバシー設定を更新しました', 'SETTINGS');
+        }
+
+        /* -------------------------------------------------------------
+           サークルデータのクラウド＆ローカルハイブリッド同期ヘルパー
+           （Firestoreのセキュリティルール変更不要で動作する設計）
+        ------------------------------------------------------------- */
+        async function fetchAllCirclesSafe() {
+            const circleMap = {};
+            try {
+                const localStr = localStorage.getItem('lt_circles_cache');
+                if (localStr) {
+                    JSON.parse(localStr).forEach(c => { if (c && c.id) circleMap[c.id] = c; });
+                }
+            } catch (e) {}
+
+            // 既存の許可済み posts コレクションからサークルデータを取得
+            try {
+                const snap = await withTimeout(db.collection('posts').where('isCircleDoc', '==', true).get(), 2000);
+                if (snap) {
+                    snap.forEach(doc => {
+                        const d = doc.data();
+                        const cid = d.circleId || doc.id;
+                        circleMap[cid] = Object.assign({ id: cid }, d);
+                    });
+                }
+            } catch (e) {}
+
+            // circles コレクションからも念のため取得試行
+            try {
+                const snap2 = await withTimeout(db.collection('circles').get(), 1500);
+                if (snap2) {
+                    snap2.forEach(doc => {
+                        circleMap[doc.id] = Object.assign({ id: doc.id }, doc.data());
+                    });
+                }
+            } catch (e) {}
+
+            const list = Object.values(circleMap);
+            try {
+                localStorage.setItem('lt_circles_cache', JSON.stringify(list));
+            } catch (e) {}
+            return list;
+        }
+
+        async function saveCircleSafe(circleId, circleData) {
+            const payload = Object.assign({}, circleData, {
+                id: circleId,
+                circleId: circleId,
+                isCircleDoc: true
+            });
+
+            // ローカルキャッシュを即時更新
+            try {
+                const localStr = localStorage.getItem('lt_circles_cache');
+                let list = localStr ? JSON.parse(localStr) : [];
+                const idx = list.findIndex(c => c.id === circleId);
+                if (idx >= 0) list[idx] = Object.assign(list[idx], payload);
+                else list.unshift(payload);
+                localStorage.setItem('lt_circles_cache', JSON.stringify(list));
+            } catch (e) {}
+
+            // posts コレクションと circles コレクションの両方に非同期保存
+            try {
+                await db.collection('posts').doc(circleId).set(payload, { merge: true });
+            } catch (e) {}
+            try {
+                await db.collection('circles').doc(circleId).set(payload, { merge: true });
+            } catch (e) {}
+        }
+
+        async function loadCircleTrophiesForBoard() {
+            circleTrophies = [];
+            try {
+                const allCircles = await fetchAllCirclesSafe();
+                allCircles.forEach(cData => {
+                    const members = Array.isArray(cData.members) ? cData.members : [];
+                    const isJoined = (currentUser && members.includes(currentUser.uid)) || (myProfile.joinedCircles || []).includes(cData.id);
+                    if (isJoined && Array.isArray(cData.circleTrophies)) {
+                        cData.circleTrophies.forEach(ct => {
+                            circleTrophies.push({
+                                id: ct.id,
+                                name: `⭕ ${cData.circleName}: ${ct.name}`,
+                                condition: ct.condition,
+                                rank: ct.rank || 'gold',
+                                isCircleTrophy: true,
+                                circleId: cData.id
+                            });
+                        });
+                    }
+                });
+            } catch (e) {}
+        }
+
+        /* -------------------------------------------------------------
+           実績一覧 View
+        ------------------------------------------------------------- */
+        async function renderTrophiesView() {
+            const container = document.getElementById('main-container');
+            if (!container) return;
+
+            await loadCircleTrophiesForBoard();
+            container.innerHTML = '';
+
+            if (currentUser && !myProfile.username) {
+                const warnBanner = document.createElement('div');
+                warnBanner.style.cssText = 'background:rgba(255,45,85,0.15); border:1px solid var(--accent-red); padding:12px; border-radius:10px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;';
+                warnBanner.innerHTML = `
+                    <div style="font-size:0.75rem; font-weight:700; color:var(--text-primary);">⚠️ ユーザーIDが未設定です（検索に表示されません）</div>
+                    <button class="btn-action-small" style="border-color:var(--accent-red); flex-shrink:0;" onclick="openInitialProfileSetupModal()">今すぐ設定</button>
+                `;
+                container.appendChild(warnBanner);
+            }
+
+            const categorySwitcher = document.createElement('div');
+            categorySwitcher.className = 'category-tabs';
+            categorySwitcher.innerHTML = `
+                <button class="category-tab-btn ${boardCategory === 'default' ? 'active' : ''}" onclick="boardCategory='default'; renderTrophiesView();">
+                    🏆 通常 (${defaultTrophies.length})
+                </button>
+                <button class="category-tab-btn ${boardCategory === 'custom' ? 'active' : ''}" onclick="boardCategory='custom'; renderTrophiesView();">
+                    ✨ カスタム (${customTrophies.length})
+                </button>
+                <button class="category-tab-btn ${boardCategory === 'circle' ? 'active' : ''}" onclick="boardCategory='circle'; renderTrophiesView();">
+                    ⭕ サークル (${circleTrophies.length})
+                </button>
+            `;
+            container.appendChild(categorySwitcher);
+
+            const actionRow = document.createElement('div');
+            actionRow.style.cssText = 'display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;';
+            
+            let boardTitle = '🏆 トロフィーボード';
+            if (boardCategory === 'custom') boardTitle = '✨ マイ・カスタム実績';
+            if (boardCategory === 'circle') boardTitle = '⭕ 参加サークルの実績';
+
+            actionRow.innerHTML = `
+                <div style="font-size:0.85rem; font-weight:800; color:var(--text-primary);">${boardTitle}</div>
+                ${boardCategory === 'custom' ? '<button class="btn-action-small" onclick="openModal(\'custom-trophy-modal\')">+ カスタム作成</button>' : ''}
+            `;
+            container.appendChild(actionRow);
+
+            const filterRow = document.createElement('div');
+            filterRow.style.cssText = 'display:flex; gap:6px; overflow-x:auto; margin-bottom:14px; padding-bottom:2px;';
+            ['all', 'unlocked', 'platinum', 'gold', 'silver', 'bronze'].forEach(f => {
+                const btn = document.createElement('button');
+                btn.className = `btn-action-small ${trophyFilter === f ? 'following' : ''}`;
+                btn.style.cssText += 'border-radius:20px; padding:6px 12px; font-size:0.7rem; flex-shrink:0;';
+                btn.innerText = f.toUpperCase();
+                btn.onclick = () => { trophyFilter = f; renderTrophiesView(); };
+                filterRow.appendChild(btn);
+            });
+            container.appendChild(filterRow);
 
             let count = { platinum: 0, gold: 0, silver: 0, bronze: 0 };
             let totalUnlocked = 0;
+            const allTrophiesList = getAllTrophies();
 
-            defaultTrophies.forEach(t => {
-                const isUnlocked = !!userState[t.id];
-                if (isUnlocked) {
-                    count[t.rank]++;
+            allTrophiesList.forEach(t => {
+                if (userState[t.id]) {
+                    if (count[t.rank] !== undefined) count[t.rank]++;
                     totalUnlocked++;
                 }
+            });
 
-                if (filter !== 'all') {
-                    if (filter === 'unlocked' && !isUnlocked) return;
-                    if (filter !== 'unlocked' && t.rank !== filter) return;
+            const cp = document.getElementById('count-plat');
+            const cg = document.getElementById('count-gold');
+            const cs = document.getElementById('count-silver');
+            const cb = document.getElementById('count-bronze');
+            if (cp) cp.innerText = count.platinum;
+            if (cg) cg.innerText = count.gold;
+            if (cs) cs.innerText = count.silver;
+            if (cb) cb.innerText = count.bronze;
+
+            const percent = allTrophiesList.length > 0 ? Math.round((totalUnlocked / allTrophiesList.length) * 100) : 0;
+            const pp = document.getElementById('progress-percent');
+            if (pp) pp.innerText = `${percent}%`;
+
+            let targetList = defaultTrophies;
+            if (boardCategory === 'custom') targetList = customTrophies;
+            if (boardCategory === 'circle') targetList = circleTrophies;
+
+            const trophyListEl = document.createElement('div');
+
+            if (boardCategory === 'custom' && customTrophies.length === 0) {
+                trophyListEl.innerHTML = `
+                    <div style="text-align:center; color:var(--text-secondary); font-size:0.8rem; padding:36px 20px; background:var(--surface-card); border-radius:12px; border:1px dashed var(--border-color);">
+                        まだカスタム実績がありません。<br>上の「+ カスタム作成」から目標を追加しましょう！
+                    </div>
+                `;
+                container.appendChild(trophyListEl);
+                return;
+            }
+
+            if (boardCategory === 'circle' && circleTrophies.length === 0) {
+                trophyListEl.innerHTML = `
+                    <div style="text-align:center; color:var(--text-secondary); font-size:0.8rem; padding:36px 20px; background:var(--surface-card); border-radius:12px; border:1px dashed var(--border-color);">
+                        参加しているサークルにまだサークル実績がありません。<br>「サークルタブ」からサークルに参加・作成して実績を作ろう！
+                    </div>
+                `;
+                container.appendChild(trophyListEl);
+                return;
+            }
+
+            let visibleCount = 0;
+            targetList.forEach(t => {
+                const isUnlocked = !!userState[t.id];
+
+                if (trophyFilter !== 'all') {
+                    if (trophyFilter === 'unlocked' && !isUnlocked) return;
+                    if (trophyFilter !== 'unlocked' && t.rank !== trophyFilter) return;
                 }
 
+                visibleCount++;
                 const card = document.createElement('div');
                 card.className = `trophy-card ${isUnlocked ? 'unlocked' : ''} ${t.isUltimate ? 'ultimate' : ''}`;
                 
-                card.innerHTML = `
-                    <div class="icon-box">
-                        <i class="fa-solid fa-trophy"></i>
+                const iconContent = (isUnlocked && userState[t.id].photo)
+                    ? `<img src="${userState[t.id].photo}" alt="Trophy Photo">`
+                    : `<i class="fa-solid fa-trophy"></i>`;
+
+                let displayNameStr = t.name;
+                if (t.isCustom) displayNameStr = `✨ ${t.name}`;
+                else if (t.isCircleTrophy) displayNameStr = `${t.name}`;
+                else if (t.isUltimate) displayNameStr = `★ ${t.name}`;
+
+                const infoBox = document.createElement('div');
+                infoBox.className = 'trophy-info';
+                infoBox.innerHTML = `
+                    <div class="trophy-name">${displayNameStr}</div>
+                    <div class="trophy-condition">${t.condition}</div>
+                    <div class="trophy-meta">
+                        <span class="rank-tag">${t.rank}</span>
+                        ${isUnlocked ? `<span class="unlocked-tag"><i class="fa-solid fa-check"></i> ${userState[t.id].date} 解除済</span>` : ''}
                     </div>
-                    <div class="trophy-info">
-                        <div class="trophy-name">${t.isUltimate ? '★ ' : ''}${t.name}</div>
-                        <div class="trophy-condition">${t.condition}</div>
-                        <div class="trophy-meta">
-                            <span class="rank-tag">${t.rank}</span>
-                            ${isUnlocked ? `<span class="unlocked-tag"><i class="fa-solid fa-check"></i> ${userState[t.id].date}</span>` : ''}
-                        </div>
-                    </div>
-                    ${!isUnlocked ? `<button class="unlock-btn" onclick="openModal(${t.id})">解除</button>` : ''}
                 `;
-                listEl.appendChild(card);
+
+                const iconBox = document.createElement('div');
+                iconBox.className = 'icon-box';
+                iconBox.innerHTML = iconContent;
+
+                const actionsGroup = document.createElement('div');
+                actionsGroup.className = 'card-actions-group';
+
+                if (!isUnlocked) {
+                    const unlockBtn = document.createElement('button');
+                    unlockBtn.className = 'unlock-btn';
+                    unlockBtn.innerText = '解除';
+                    unlockBtn.onclick = () => openUnlockModal(t.id);
+                    actionsGroup.appendChild(unlockBtn);
+                }
+
+                if (t.isCustom || boardCategory === 'custom') {
+                    const delBtn = document.createElement('button');
+                    delBtn.className = 'delete-btn';
+                    delBtn.innerText = '削除';
+                    delBtn.onclick = () => deleteCustomTrophy(t.id);
+                    actionsGroup.appendChild(delBtn);
+                }
+
+                card.appendChild(iconBox);
+                card.appendChild(infoBox);
+                card.appendChild(actionsGroup);
+                trophyListEl.appendChild(card);
             });
 
-            document.getElementById('count-plat').innerText = count.platinum;
-            document.getElementById('count-gold').innerText = count.gold;
-            document.getElementById('count-silver').innerText = count.silver;
-            document.getElementById('count-bronze').innerText = count.bronze;
+            if (visibleCount === 0) {
+                trophyListEl.innerHTML = '<div style="text-align:center; color:var(--text-secondary); font-size:0.8rem; padding:30px;">条件に一致する実績がありません</div>';
+            }
 
-            const percent = Math.round((totalUnlocked / defaultTrophies.length) * 100);
-            document.getElementById('progress-percent').innerText = `${percent}%`;
+            container.appendChild(trophyListEl);
         }
 
-        function filterTrophies(filter) {
-            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
-            renderTrophies(filter);
+        function addCustomTrophy() {
+            const titleInput = document.getElementById('custom-title');
+            const conditionInput = document.getElementById('custom-condition');
+            const rankSelect = document.getElementById('custom-rank');
+            
+            const title = titleInput.value.trim();
+            const condition = conditionInput.value.trim();
+            const rank = rankSelect.value;
+            
+            if (!title || !condition) {
+                alert('実績タイトルと達成条件の両方を入力してください');
+                return;
+            }
+
+            const newTrophy = {
+                id: 'custom_' + Date.now(),
+                name: title,
+                condition: condition,
+                rank: rank,
+                isCustom: true
+            };
+
+            customTrophies.push(newTrophy);
+
+            titleInput.value = '';
+            conditionInput.value = '';
+            closeModal('custom-trophy-modal');
+
+            boardCategory = 'custom';
+            trophyFilter = 'all';
+            switchMainTab('trophies');
+            showNotification(`カスタム実績「${title}」を追加しました！`, 'CUSTOM TROPHY ADDED');
+
+            saveCustomTrophiesToStorage();
         }
 
-        function openModal(id) {
-            selectedTrophyId = id;
-            const trophy = defaultTrophies.find(t => t.id === id);
-            document.getElementById('modal-trophy-title').innerText = `「${trophy.name}」`;
-            document.getElementById('photo-preview').style.display = 'none';
-            document.getElementById('photo-input').value = '';
-            document.getElementById('unlock-modal').classList.add('active');
+        async function deleteCustomTrophy(id) {
+            const target = customTrophies.find(t => String(t.id) === String(id));
+            const targetName = target ? target.name : 'カスタム実績';
+
+            if (!confirm(`カスタム実績「${targetName}」を削除しますか？`)) return;
+
+            customTrophies = customTrophies.filter(t => String(t.id) !== String(id));
+            if (userState[id]) {
+                delete userState[id];
+                await removeSingleUnlockFromStorage(id);
+            }
+
+            renderTrophiesView();
+            showNotification(`「${targetName}」を削除しました`, 'CUSTOM TROPHY DELETED');
+
+            saveCustomTrophiesToStorage();
         }
 
-        function closeModal() {
-            document.getElementById('unlock-modal').classList.remove('active');
-            selectedTrophyId = null;
+        /* -------------------------------------------------------------
+           サークル（Circle）機能 View & ロジック
+        ------------------------------------------------------------- */
+        async function renderCircleView() {
+            const container = document.getElementById('main-container');
+            if (!container) return;
+            container.innerHTML = '<div style="text-align:center; color:var(--text-secondary); font-size:0.8rem; padding:20px;">サークル情報を読み込み中...</div>';
+
+            activeCircles = await fetchAllCirclesSafe();
+
+            container.innerHTML = `
+                <div style="font-size:0.9rem; font-weight:800; margin-bottom:14px; text-align:center;">⭕ サークル機能</div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                    <div style="font-size:0.8rem; font-weight:700; color:var(--text-secondary);">コミュニティ＆サークル実績</div>
+                    <button class="btn-action-small" onclick="openModal('create-circle-modal')">+ サークルを立ち上げる</button>
+                </div>
+                <div id="circle-list-container"></div>
+            `;
+
+            renderCircleList();
         }
 
-        function previewImage(e) {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(evt) {
-                    const img = document.getElementById('photo-preview');
-                    img.src = evt.target.result;
-                    img.style.display = 'block';
+        function renderCircleList() {
+            const listEl = document.getElementById('circle-list-container');
+            if (!listEl) return;
+            listEl.innerHTML = '';
+
+            if (activeCircles.length === 0) {
+                listEl.innerHTML = '<div style="text-align:center; color:var(--text-secondary); font-size:0.8rem; padding:30px; background:var(--surface-card); border-radius:12px;">まだ作成されたサークルはありません。最初のサークルを立ち上げよう！</div>';
+                return;
+            }
+
+            activeCircles.forEach(circle => {
+                const members = Array.isArray(circle.members) ? circle.members : [];
+                const isJoined = (currentUser && members.includes(currentUser.uid)) || (myProfile.joinedCircles || []).includes(circle.id);
+                const trophies = Array.isArray(circle.circleTrophies) ? circle.circleTrophies : [];
+
+                const card = document.createElement('div');
+                card.className = 'feed-card';
+                card.style.cssText = 'margin-bottom: 14px; padding: 16px;';
+                card.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <div style="font-size:1rem; font-weight:900; color:var(--text-primary);">⭕ ${circle.circleName}</div>
+                        <button class="btn-action-small ${isJoined ? 'following' : ''}" onclick="toggleJoinCircle('${circle.id}', ${isJoined})">
+                            ${isJoined ? '参加中' : 'サークルに参加'}
+                        </button>
+                    </div>
+                    <div style="font-size:0.75rem; color:var(--text-secondary); margin-bottom:10px; line-height:1.4;">${circle.circleBio || '自己紹介なし'}</div>
+                    <div style="font-size:0.68rem; color:var(--text-tertiary); margin-bottom:12px;">
+                        👑 ホスト: <b>${circle.hostName || '不明'}</b> ・ 👥 メンバー: <b>${members.length}人</b> ・ 🏆 サークル実績: <b>${trophies.length}件</b>
+                    </div>
+                    ${isJoined ? `
+                        <div style="border-top:1px solid var(--border-color); padding-top:10px; margin-top:10px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                <div style="font-size:0.78rem; font-weight:800;">サークル専用実績一覧</div>
+                                <button class="btn-action-small" onclick="openCircleTrophyModal('${circle.id}')">+ サークル実績を作成</button>
+                            </div>
+                            <div id="circle-trophies-${circle.id}"></div>
+                        </div>
+                    ` : '<div style="font-size:0.7rem; color:var(--text-tertiary); font-style:italic;">※参加するとこのサークルの実績を作成・解除できるようになります</div>'}
+                `;
+
+                listEl.appendChild(card);
+
+                if (isJoined) {
+                    const tContainer = document.getElementById(`circle-trophies-${circle.id}`);
+                    if (tContainer) {
+                        if (trophies.length === 0) {
+                            tContainer.innerHTML = '<div style="font-size:0.72rem; color:var(--text-secondary); padding:6px 0;">まだサークル実績がありません。メンバー全員が作成できます！</div>';
+                        } else {
+                            trophies.forEach(ct => {
+                                const isUnlocked = !!userState[ct.id];
+                                const tItem = document.createElement('div');
+                                tItem.style.cssText = 'background:var(--surface-hover); border:1px solid var(--border-color); padding:8px 10px; border-radius:8px; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between; gap:10px;';
+                                tItem.innerHTML = `
+                                    <div style="overflow:hidden;">
+                                        <div style="font-size:0.8rem; font-weight:700;">✨ ${ct.name}</div>
+                                        <div style="font-size:0.7rem; color:var(--text-secondary);">${ct.condition}</div>
+                                    </div>
+                                    <div>
+                                        ${isUnlocked ? '<span class="unlocked-tag"><i class="fa-solid fa-check"></i> 解除済</span>' : `<button class="unlock-btn" onclick="openUnlockModal('${ct.id}')">解除</button>`}
+                                    </div>
+                                `;
+                                tContainer.appendChild(tItem);
+                            });
+                        }
+                    }
                 }
-                reader.readAsDataURL(file);
+            });
+        }
+
+        async function createCircle() {
+            if (!currentUser) return;
+            const nameInput = document.getElementById('circle-name-input');
+            const bioInput = document.getElementById('circle-bio-input');
+            const cName = nameInput.value.trim();
+            const cBio = bioInput.value.trim();
+
+            if (!cName) return alert('サークル名を入力してください');
+
+            const circleId = 'circle_' + Date.now();
+            const newCircleData = {
+                id: circleId,
+                circleId: circleId,
+                isCircleDoc: true,
+                circleName: cName,
+                circleBio: cBio,
+                hostUid: currentUser.uid,
+                hostName: myProfile.displayName || myProfile.username || 'ユーザー',
+                members: [currentUser.uid],
+                circleTrophies: [],
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            await saveCircleSafe(circleId, newCircleData);
+
+            if (!myProfile.joinedCircles) myProfile.joinedCircles = [];
+            if (!myProfile.joinedCircles.includes(circleId)) myProfile.joinedCircles.push(circleId);
+            saveProfileToLocalCache(currentUser.uid, myProfile);
+            syncProfileToCloudBackground(currentUser.uid, myProfile);
+
+            nameInput.value = '';
+            bioInput.value = '';
+            closeModal('create-circle-modal');
+            showNotification(`サークル「${cName}」を立ち上げました！`, 'CIRCLE CREATED');
+            renderCircleView();
+        }
+
+        async function toggleJoinCircle(circleId, isJoined) {
+            if (!currentUser) return;
+            const uid = currentUser.uid;
+            const targetCircle = activeCircles.find(c => c.id === circleId);
+            if (!targetCircle) return;
+
+            let members = Array.isArray(targetCircle.members) ? [...targetCircle.members] : [];
+
+            if (isJoined) {
+                members = members.filter(id => id !== uid);
+                myProfile.joinedCircles = (myProfile.joinedCircles || []).filter(id => id !== circleId);
+                showNotification('サークルを退会しました', 'CIRCLE LEFT');
+            } else {
+                if (!members.includes(uid)) members.push(uid);
+                if (!myProfile.joinedCircles) myProfile.joinedCircles = [];
+                if (!myProfile.joinedCircles.includes(circleId)) myProfile.joinedCircles.push(circleId);
+                showNotification('サークルに参加しました！', 'CIRCLE JOINED');
+            }
+
+            targetCircle.members = members;
+            await saveCircleSafe(circleId, targetCircle);
+            saveProfileToLocalCache(uid, myProfile);
+            syncProfileToCloudBackground(uid, myProfile);
+            renderCircleView();
+        }
+
+        function openCircleTrophyModal(circleId) {
+            currentActiveCircleId = circleId;
+            document.getElementById('circle-trophy-title').value = '';
+            document.getElementById('circle-trophy-condition').value = '';
+            openModal('circle-trophy-modal');
+        }
+
+        async function addCircleTrophy() {
+            if (!currentActiveCircleId || !currentUser) return;
+            const titleInput = document.getElementById('circle-trophy-title');
+            const conditionInput = document.getElementById('circle-trophy-condition');
+            const rankSelect = document.getElementById('circle-trophy-rank');
+
+            const title = titleInput.value.trim();
+            const condition = conditionInput.value.trim();
+            const rank = rankSelect.value;
+
+            if (!title || !condition) return alert('タイトルと達成条件を入力してください');
+
+            const targetCircle = activeCircles.find(c => c.id === currentActiveCircleId);
+            if (!targetCircle) return;
+
+            const newTrophyId = 'ctrophy_' + Date.now();
+            const newTrophyObj = {
+                id: newTrophyId,
+                name: title,
+                condition: condition,
+                rank: rank,
+                creatorUid: currentUser.uid,
+                isCircleTrophy: true,
+                circleId: currentActiveCircleId
+            };
+
+            if (!Array.isArray(targetCircle.circleTrophies)) targetCircle.circleTrophies = [];
+            targetCircle.circleTrophies.push(newTrophyObj);
+
+            await saveCircleSafe(currentActiveCircleId, targetCircle);
+            await loadCircleTrophiesForBoard();
+
+            closeModal('circle-trophy-modal');
+            showNotification(`サークル実績「${title}」を作成しました！`, 'CIRCLE TROPHY CREATED');
+            renderCircleView();
+        }
+
+        /* -------------------------------------------------------------
+           実績解除関連
+        ------------------------------------------------------------- */
+        async function openUnlockModal(id) {
+            selectedTrophyId = id;
+            tempUnlockPhotoBase64 = "";
+            await loadCircleTrophiesForBoard();
+            const trophy = getAllTrophies().find(t => String(t.id) === String(id));
+            document.getElementById('modal-trophy-title').innerText = `🏆 「${trophy ? trophy.name : '実績'}」を解除`;
+            
+            const previewEl = document.getElementById('photo-preview');
+            previewEl.style.display = 'none';
+            previewEl.removeAttribute('src');
+            
+            document.getElementById('photo-input').value = '';
+            document.getElementById('unlock-comment-input').value = '';
+            document.getElementById('unlock-photo-zone').classList.remove('required-highlight');
+            document.getElementById('photo-upload-label').innerText = '📸 証拠写真を撮影・選択 (必須)';
+            openModal('unlock-modal');
+        }
+
+        async function previewImage(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            document.getElementById('photo-upload-label').innerText = '写真を最適化中...';
+            try {
+                tempUnlockPhotoBase64 = await compressImageFile(file, 600, 0.65);
+                const img = document.getElementById('photo-preview');
+                img.src = tempUnlockPhotoBase64;
+                img.style.display = 'block';
+                document.getElementById('unlock-photo-zone').classList.remove('required-highlight');
+                document.getElementById('photo-upload-label').innerText = '✅ 写真を選択済み (タップで変更)';
+            } catch (err) {
+                alert('写真の読み込みに失敗しました。別の画像をお試しください。');
+                tempUnlockPhotoBase64 = "";
             }
         }
 
         function confirmUnlock() {
             if (!selectedTrophyId) return;
 
-            const trophy = defaultTrophies.find(t => t.id === selectedTrophyId);
-            userState[selectedTrophyId] = {
-                date: new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }),
-                photo: document.getElementById('photo-preview').src || null
+            if (!tempUnlockPhotoBase64) {
+                document.getElementById('unlock-photo-zone').classList.add('required-highlight');
+                alert('実績を解除するには証拠写真の添付が必須です！上のカメラ枠をタップして写真を選択してください。');
+                return;
+            }
+
+            const trophy = getAllTrophies().find(t => String(t.id) === String(selectedTrophyId));
+            const trophyName = trophy ? trophy.name : '実績';
+            const trophyCondition = trophy ? trophy.condition : '';
+            const commentText = document.getElementById('unlock-comment-input').value.trim();
+            
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const dateTimeStr = `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
+
+            const unlockedId = String(selectedTrophyId);
+            const photoToSave = tempUnlockPhotoBase64;
+
+            const unlockEntry = {
+                date: dateTimeStr,
+                photo: photoToSave,
+                comment: commentText,
+                condition: trophyCondition,
+                trophyName: trophyName
             };
 
-            localStorage.setItem('life_trophies_v_mono', JSON.stringify(userState));
-            closeModal();
-            renderTrophies();
+            userState[unlockedId] = unlockEntry;
 
-            showNotification(trophy.name);
+            closeModal('unlock-modal');
+            switchMainTab(activeTab);
+            showNotification(`実績を解除しました！「${trophyName}」`, 'TROPHY UNLOCKED!');
+
+            saveSingleUnlockToStorage(unlockedId, unlockEntry);
+
+            try {
+                db.collection('posts').add({
+                    uid: currentUser.uid,
+                    displayName: myProfile.displayName || myProfile.username || '名無しユーザー',
+                    username: myProfile.username || 'user',
+                    userAvatar: myProfile.avatar,
+                    trophyId: unlockedId,
+                    trophyName: trophyName,
+                    condition: trophyCondition,
+                    photo: photoToSave,
+                    comment: commentText,
+                    date: dateTimeStr,
+                    likes: [],
+                    comments: [],
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                }).catch(()=>{});
+            } catch (e) {}
         }
 
-        function showNotification(title) {
+        /* -------------------------------------------------------------
+           ホーム（タイムライン）View （構文エラー完全修正＆復活）
+        ------------------------------------------------------------- */
+        async function renderFeedView() {
+            const container = document.getElementById('main-container');
+            if (!container) return;
+            container.innerHTML = '<div style="text-align:center; color:var(--text-secondary); font-size:0.8rem; padding:20px;">タイムライン読み込み中...</div>';
+
+            try {
+                const snapshot = await withTimeout(db.collection('posts').orderBy('createdAt', 'desc').limit(40).get(), 3000);
+                container.innerHTML = '<div style="font-size:0.9rem; font-weight:800; margin-bottom:14px; text-align:center;">📡 タイムライン</div>';
+
+                let realPostCount = 0;
+                if (snapshot && !snapshot.empty) {
+                    snapshot.forEach(doc => {
+                        const post = doc.data();
+                        if (post.isProfileIndex || post.isCircleDoc) return;
+                        realPostCount++;
+
+                        const postId = doc.id;
+                        const isLiked = currentUser && (post.likes || []).includes(currentUser.uid);
+
+                        const avatarHTML = post.userAvatar 
+                            ? `<img src="${post.userAvatar}" class="feed-avatar">` 
+                            : `<div class="feed-avatar"><i class="fa-solid fa-user"></i></div>`;
+
+                        const commentHTML = post.comment && post.comment.trim() !== '' 
+                            ? `<div class="feed-comment-box">${post.comment}</div>` 
+                            : '';
+
+                        const card = document.createElement('div');
+                        card.className = 'feed-card';
+                        card.innerHTML = `
+                            <div class="feed-header">
+                                <div class="feed-user-info" id="feed-user-${postId}">
+                                    ${avatarHTML}
+                                    <div>
+                                        <div class="feed-display-name">${post.displayName || post.username || 'ユーザー'}</div>
+                                        <div class="feed-user-name">@${post.username || 'user'}</div>
+                                    </div>
+                                </div>
+                                <div class="feed-time">${post.date || ''}</div>
+                            </div>
+
+                            <div class="feed-trophy-banner">
+                                <div style="font-size:0.65rem; color:var(--text-secondary); font-weight:800; letter-spacing:1px; margin-bottom:2px;">TROPHY UNLOCKED</div>
+                                <div style="font-size:0.95rem; font-weight:800; color:var(--text-primary);">🏆 ${post.trophyName || '実績'}</div>
+                            </div>
+
+                            ${post.photo ? `<img src="${post.photo}" class="feed-photo" id="feed-img-${postId}">` : ''}
+                            ${commentHTML}
+
+                            <div class="feed-actions">
+                                <div class="feed-actions-left">
+                                    <div class="feed-action-btn ${isLiked ? 'liked' : ''}" onclick="toggleLike('${postId}', ${isLiked}, '${post.uid}')">
+                                        <i class="${isLiked ? 'fa-solid' : 'fa-regular'} fa-heart"></i>
+                                        <span>${(post.likes || []).length}</span>
+                                    </div>
+                                    <div class="feed-action-btn">
+                                        <i class="fa-regular fa-comment"></i>
+                                        <span>${(post.comments || []).length}</span>
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: 10px; align-items: center;">
+                                    ${currentUser && post.uid === currentUser.uid ? `<div class="feed-action-btn" style="color:var(--accent-red);" onclick="deletePostByPostId('${postId}', '${post.trophyId || ''}')" title="投稿を削除"><i class="fa-solid fa-trash"></i></div>` : ''}
+                                    <div class="feed-action-btn" id="feed-share-${postId}">
+                                        <i class="fa-solid fa-share-nodes"></i>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="feed-comments-section">
+                                <div id="comments-list-${postId}">
+                                    ${(post.comments || []).map(c => `<div class="comment-item"><b>${c.displayName || c.username}:</b> ${c.text}</div>`).join('')}
+                                </div>
+                                <div class="comment-input-box">
+                                    <input type="text" id="comment-input-${postId}" class="form-input" placeholder="お祝いコメントを入力..." style="margin-bottom:0; font-size:0.75rem; padding:8px 12px;">
+                                    <button class="btn-action-small" onclick="addComment('${postId}', '${post.uid}')">送信</button>
+                                </div>
+                            </div>
+                        `;
+                        container.appendChild(card);
+
+                        const userBtn = document.getElementById(`feed-user-${postId}`);
+                        if (userBtn) userBtn.onclick = () => openUserFromFeed(post.uid);
+
+                        const imgBtn = document.getElementById(`feed-img-${postId}`);
+                        if (imgBtn) {
+                            imgBtn.onclick = () => openPhotoLightbox(post.photo, post.trophyName || '実績', post.condition || '', post.date || '', post.comment || '', postId, post.uid);
+                        }
+
+                        const shareBtn = document.getElementById(`feed-share-${postId}`);
+                        if (shareBtn) {
+                            shareBtn.onclick = () => sharePost(post.trophyName || '実績', post.displayName || post.username || 'ユーザー');
+                        }
+                    });
+                }
+
+                if (realPostCount === 0) {
+                    container.innerHTML += '<div style="text-align:center; color:var(--text-secondary); font-size:0.8rem; padding:30px;">まだ投稿がありません。実績を解除してタイムラインに流そう！</div>';
+                }
+            } catch (e) {
+                container.innerHTML = '<div style="text-align:center; color:var(--text-secondary); font-size:0.8rem; padding:30px;">タイムラインの読み込みに失敗しました</div>';
+            }
+        }
+
+        async function openUserFromFeed(targetUid) {
+            if (!targetUid) return;
+            if (currentUser && targetUid === currentUser.uid) {
+                switchMainTab('profile');
+                return;
+            }
+            try {
+                const doc = await withTimeout(db.collection('users').doc(targetUid).get(), 2000);
+                if (doc && doc.exists) {
+                    viewUserProfile(targetUid, doc.data());
+                    return;
+                }
+            } catch (e) {}
+            try {
+                const idxDoc = await withTimeout(db.collection('posts').doc('profile_' + targetUid).get(), 2000);
+                if (idxDoc && idxDoc.exists) {
+                    const d = idxDoc.data();
+                    viewUserProfile(targetUid, {
+                        uid: targetUid,
+                        displayName: d.displayName,
+                        username: d.username,
+                        bio: d.bio,
+                        avatar: d.userAvatar
+                    });
+                }
+            } catch (e) {}
+        }
+
+        async function toggleLike(postId, currentLiked, postOwnerUid) {
+            if (!currentUser) return;
+            const postRef = db.collection('posts').doc(postId);
+            if (currentLiked) {
+                await postRef.update({ likes: firebase.firestore.FieldValue.arrayRemove(currentUser.uid) }).catch(()=>{});
+            } else {
+                await postRef.update({ likes: firebase.firestore.FieldValue.arrayUnion(currentUser.uid) }).catch(()=>{});
+                sendNotification(postOwnerUid, 'like', 'があなたの投稿に「いいね！」しました。');
+            }
+            renderFeedView();
+        }
+
+        async function addComment(postId, postOwnerUid) {
+            if (!currentUser) return;
+            const input = document.getElementById(`comment-input-${postId}`);
+            if (!input) return;
+            const text = input.value.trim();
+            if (!text) return;
+
+            const postRef = db.collection('posts').doc(postId);
+            await postRef.update({
+                comments: firebase.firestore.FieldValue.arrayUnion({
+                    uid: currentUser.uid,
+                    displayName: myProfile.displayName || myProfile.username,
+                    username: myProfile.username,
+                    text: text,
+                    createdAt: new Date().toISOString()
+                })
+            }).catch(()=>{});
+
+            sendNotification(postOwnerUid, 'comment', `があなたの投稿にコメントしました: "${text}"`);
+            input.value = '';
+            renderFeedView();
+        }
+
+        /* -------------------------------------------------------------
+           ユーザー検索 View （完全復活）
+        ------------------------------------------------------------- */
+        function renderSearchView() {
+            const container = document.getElementById('main-container');
+            if (!container) return;
+            container.innerHTML = `
+                <div style="font-size:0.9rem; font-weight:800; margin-bottom:14px; text-align:center;">🔍 ユーザー検索</div>
+                <div style="display:flex; gap:10px; margin-bottom:16px;">
+                    <input type="text" id="search-query" class="form-input" placeholder="ユーザーID (@なしでもOK) や表示名を入力..." style="margin-bottom:0;" oninput="searchUsers()">
+                    <button class="modal-btn" style="width: 90px; margin-top:0;" onclick="searchUsers()">検索</button>
+                </div>
+                <div id="search-results">
+                    <div style="text-align:center; color:var(--text-secondary); font-size:0.8rem; padding:30px; background:var(--surface-card); border-radius:12px;">
+                        検索したいユーザーのIDまたは名前を入力してください
+                    </div>
+                </div>
+            `;
+        }
+
+        async function searchUsers() {
+            const qInput = document.getElementById('search-query');
+            if (!qInput) return;
+            const rawQ = qInput.value.trim().replace(/^@/, '').toLowerCase();
+            const resultsEl = document.getElementById('search-results');
+            if (!resultsEl) return;
+
+            if (!rawQ) {
+                resultsEl.innerHTML = `
+                    <div style="text-align:center; color:var(--text-secondary); font-size:0.8rem; padding:30px; background:var(--surface-card); border-radius:12px;">
+                        検索したいユーザーのIDまたは名前を入力してください
+                    </div>
+                `;
+                return;
+            }
+
+            resultsEl.innerHTML = '<div style="text-align:center; color:var(--text-secondary); font-size:0.8rem; padding:16px;">ユーザーを検索中...</div>';
+
+            const userMap = {};
+
+            try {
+                const snapshot = await withTimeout(db.collection('users').get(), 2000);
+                if (snapshot) {
+                    snapshot.forEach(doc => {
+                        if (currentUser && doc.id === currentUser.uid) return;
+                        const data = doc.data() || {};
+                        if (data.username || data.displayName) {
+                            userMap[doc.id] = {
+                                uid: doc.id,
+                                username: data.username || 'user',
+                                displayName: data.displayName || data.username || 'ユーザー',
+                                bio: data.bio || '人生の実績解除中！',
+                                avatar: data.avatar || '',
+                                following: data.following || [],
+                                followers: data.followers || [],
+                                privacy: data.privacy || 'public',
+                                trophyStatus: data.trophyStatus || {}
+                            };
+                        }
+                    });
+                }
+            } catch (e) {}
+
+            try {
+                const postsSnap = await withTimeout(db.collection('posts').limit(100).get(), 2000);
+                if (postsSnap) {
+                    postsSnap.forEach(doc => {
+                        const p = doc.data() || {};
+                        if (p.isCircleDoc) return;
+                        if (p.uid && (!currentUser || p.uid !== currentUser.uid) && (p.username || p.displayName)) {
+                            if (!userMap[p.uid] || p.isProfileIndex) {
+                                userMap[p.uid] = Object.assign(userMap[p.uid] || {}, {
+                                    uid: p.uid,
+                                    username: p.username || (userMap[p.uid] && userMap[p.uid].username) || 'user',
+                                    displayName: p.displayName || p.username || 'ユーザー',
+                                    bio: p.bio || (userMap[p.uid] && userMap[p.uid].bio) || '人生の実績解除中！',
+                                    avatar: p.userAvatar || (userMap[p.uid] && userMap[p.uid].avatar) || '',
+                                    following: (userMap[p.uid] && userMap[p.uid].following) || [],
+                                    followers: (userMap[p.uid] && userMap[p.uid].followers) || [],
+                                    privacy: 'public'
+                                });
+                            }
+                        }
+                    });
+                }
+            } catch (e) {}
+
+            resultsEl.innerHTML = '';
+            const allUsers = Object.values(userMap);
+
+            const matchedUsers = allUsers.filter(u => {
+                const uName = String(u.username || '').toLowerCase();
+                const dName = String(u.displayName || '').toLowerCase();
+                return uName.includes(rawQ) || dName.includes(rawQ);
+            });
+
+            const headerLabel = document.createElement('div');
+            headerLabel.style.cssText = 'font-size:0.75rem; font-weight:700; color:var(--text-secondary); margin-bottom:10px;';
+            headerLabel.innerText = `「${rawQ}」の検索結果 (${matchedUsers.length}件)`;
+            resultsEl.appendChild(headerLabel);
+
+            if (matchedUsers.length === 0) {
+                resultsEl.innerHTML += '<div style="text-align:center; color:var(--text-secondary); font-size:0.8rem; padding:24px; background:var(--surface-card); border-radius:12px;">一致するユーザーが見つかりませんでした</div>';
+                return;
+            }
+
+            matchedUsers.forEach(data => {
+                const avatarHTML = data.avatar 
+                    ? `<img src="${data.avatar}" class="feed-avatar">` 
+                    : `<div class="feed-avatar"><i class="fa-solid fa-user"></i></div>`;
+
+                const card = document.createElement('div');
+                card.className = 'feed-card';
+                card.style.cssText = 'display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; padding:12px 16px; cursor:pointer;';
+                card.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        ${avatarHTML}
+                        <div>
+                            <div style="font-size:0.9rem; font-weight:700;">${data.displayName}</div>
+                            <div style="font-size:0.7rem; color:var(--text-secondary);">@${data.username} ・ ${data.bio}</div>
+                        </div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right" style="color:var(--text-secondary);"></i>
+                `;
+                card.onclick = () => viewUserProfile(data.uid, data);
+                resultsEl.appendChild(card);
+            });
+        }
+
+        /* -------------------------------------------------------------
+           マイページ View
+        ------------------------------------------------------------- */
+        async function renderMyProfileView() {
+            const container = document.getElementById('main-container');
+            if (!container) return;
+            await loadCircleTrophiesForBoard();
+            container.innerHTML = '';
+
+            const headerBox = document.createElement('div');
+            headerBox.className = 'profile-card-header';
+            
+            const avatarHTML = myProfile.avatar 
+                ? `<img src="${myProfile.avatar}" class="profile-avatar-large">` 
+                : `<div class="profile-avatar-large"><i class="fa-solid fa-user"></i></div>`;
+
+            const displayId = myProfile.username ? `@${myProfile.username}` : '⚠️ ユーザーID未設定';
+            const displayEmail = (currentUser && currentUser.email) ? currentUser.email : (myProfile.email || '');
+
+            headerBox.innerHTML = `
+                ${avatarHTML}
+                <div class="profile-info">
+                    <div class="profile-displayname">${myProfile.displayName || myProfile.username || '名前未設定'}</div>
+                    <div class="profile-username">${displayId}</div>
+                    ${displayEmail ? `<div class="profile-email-tag"><i class="fa-regular fa-envelope"></i> ${displayEmail}</div>` : ''}
+                    <div class="profile-bio">${myProfile.bio || 'ステータス未設定'}</div>
+                    <div class="follow-stats-row">
+                        <div onclick="openFollowListModal('following')">フォロー <span>${(myProfile.following || []).length}</span></div>
+                        <div onclick="openFollowListModal('followers')">フォロワー <span>${(myProfile.followers || []).length}</span></div>
+                    </div>
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                        <button class="btn-action-small" onclick="openEditProfileModal()">プロフィール編集</button>
+                        <button class="btn-action-small" onclick="openUnlockedManageModal()">解除済み実績管理</button>
+                        <button class="btn-action-small" onclick="shareProfile()"><i class="fa-solid fa-share-nodes"></i> シェア</button>
+                        <button class="btn-action-small" onclick="openModal('settings-modal')"><i class="fa-solid fa-gear"></i> 設定</button>
+                    </div>
+                </div>
+            `;
+            container.appendChild(headerBox);
+
+            const albumTitle = document.createElement('div');
+            albumTitle.style.cssText = 'font-size:0.85rem; font-weight:800; margin-bottom:10px; color:var(--text-primary);';
+            albumTitle.innerHTML = '📸 実績フォトギャラリー (タップで拡大)';
+            container.appendChild(albumTitle);
+
+            const grid = document.createElement('div');
+            grid.className = 'gallery-grid-3';
+
+            let photoCount = 0;
+            const allList = getAllTrophies();
+            Object.keys(userState).forEach(id => {
+                const item = userState[id];
+                if (item && item.photo) {
+                    photoCount++;
+                    const trophy = allList.find(t => String(t.id) === String(id));
+                    const trophyName = item.trophyName || (trophy ? trophy.name : '実績');
+                    const trophyCondition = item.condition || (trophy ? trophy.condition : '');
+                    const comment = item.comment || '';
+                    const date = item.date || '';
+
+                    const el = document.createElement('div');
+                    el.className = 'gallery-item';
+                    el.innerHTML = `
+                        <img src="${item.photo}" alt="${trophyName}">
+                        <div class="gallery-item-title">${trophyName}</div>
+                    `;
+                    el.onclick = () => openPhotoLightbox(item.photo, trophyName, trophyCondition, date, comment, null, null);
+                    grid.appendChild(el);
+                }
+            });
+
+            if (photoCount === 0) {
+                container.innerHTML += '<div style="text-align:center; color:var(--text-secondary); font-size:0.8rem; padding:30px; background:var(--surface-card); border-radius:12px; border:1px solid var(--border-color);">まだ写真付きで解除した実績がありません。</div>';
+            } else {
+                container.appendChild(grid);
+            }
+        }
+
+        async function openPhotoLightbox(photoSrc, trophyName, conditionText, dateStr, commentText, postId = null, postOwnerUid = null) {
+            document.getElementById('lightbox-title').innerText = `🏆 ${trophyName || '実績'}`;
+            document.getElementById('lightbox-image').src = photoSrc;
+            
+            const condEl = document.getElementById('lightbox-condition');
+            if (conditionText && conditionText.trim() !== '') {
+                condEl.innerText = `🎯 達成条件: ${conditionText}`;
+                condEl.style.display = 'block';
+            } else {
+                condEl.style.display = 'none';
+            }
+
+            document.getElementById('lightbox-date').innerText = `解除日時: ${dateStr}`;
+            
+            const commentEl = document.getElementById('lightbox-comment');
+            if (commentText && commentText.trim() !== '') {
+                commentEl.innerText = `「${commentText}」`;
+                commentEl.style.display = 'block';
+                commentEl.style.color = 'var(--text-primary)';
+            } else {
+                commentEl.innerText = '（コメントなし）';
+                commentEl.style.display = 'block';
+                commentEl.style.color = 'var(--text-secondary)';
+            }
+
+            const delContainer = document.getElementById('lightbox-delete-container');
+            const delBtn = document.getElementById('lightbox-delete-post-btn');
+            if (currentUser && postOwnerUid && currentUser.uid === postOwnerUid && postId) {
+                delContainer.style.display = 'block';
+                delBtn.onclick = () => deletePostByPostId(postId, null);
+            } else {
+                delContainer.style.display = 'none';
+            }
+
+            openModal('photo-lightbox-modal');
+        }
+
+        function openUnlockedManageModal() {
+            const listContainer = document.getElementById('unlocked-manage-list-container');
+            if (!listContainer) return;
+            listContainer.innerHTML = '';
+
+            let unlockedCount = 0;
+            const allList = getAllTrophies();
+
+            allList.forEach(t => {
+                if (userState[t.id]) {
+                    unlockedCount++;
+                    const itemData = userState[t.id];
+                    const manageCard = document.createElement('div');
+                    manageCard.className = 'unlocked-manage-card';
+
+                    const leftInfo = document.createElement('div');
+                    leftInfo.style.cssText = 'display:flex; align-items:center; gap:10px; overflow:hidden;';
+                    leftInfo.innerHTML = `
+                        ${itemData.photo ? `<img src="${itemData.photo}" class="unlocked-manage-thumb">` : `<div class="unlocked-manage-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--text-secondary);"><i class="fa-solid fa-trophy"></i></div>`}
+                        <div style="overflow:hidden;">
+                            <div style="font-size:0.8rem; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${t.name}</div>
+                            <div style="font-size:0.62rem; color:var(--text-secondary);">解除日時: ${itemData.date}</div>
+                        </div>
+                    `;
+
+                    const revertBtn = document.createElement('button');
+                    revertBtn.className = 'delete-btn';
+                    revertBtn.innerText = '未解除に戻す';
+                    revertBtn.onclick = () => revertUnlock(t.id);
+
+                    manageCard.appendChild(leftInfo);
+                    manageCard.appendChild(revertBtn);
+                    listContainer.appendChild(manageCard);
+                }
+            });
+
+            if (unlockedCount === 0) {
+                listContainer.innerHTML = '<div style="text-align:center; color:var(--text-secondary); font-size:0.8rem; padding:18px;">現在解除している実績はありません</div>';
+            }
+
+            openModal('unlocked-manage-modal');
+        }
+
+        /* -------------------------------------------------------------
+           他人のプロフィール画面 View
+        ------------------------------------------------------------- */
+        async function viewUserProfile(uid, profileData) {
+            if (profileData.privacy === 'followers' && !profileData.followers?.includes(currentUser.uid)) {
+                alert('このユーザーはフォロワーのみに実績を公開しています。');
+                return;
+            }
+
+            let targetState = profileData.trophyStatus || {};
+            let freshTargetData = Object.assign({}, profileData);
+            let targetCustomTrophies = [];
+
+            try {
+                const doc = await withTimeout(db.collection('users').doc(uid).get(), 2000);
+                if (doc && doc.exists) {
+                    freshTargetData = Object.assign(freshTargetData, doc.data());
+                    if (Array.isArray(doc.data().customTrophies)) {
+                        targetCustomTrophies = doc.data().customTrophies;
+                    }
+                }
+                const statusDoc = await withTimeout(db.collection('users').doc(uid).collection('trophies').doc('status').get(), 2000);
+                if (statusDoc && statusDoc.exists) targetState = Object.assign({}, targetState, statusDoc.data());
+                
+                const customDoc = await withTimeout(db.collection('users').doc(uid).collection('trophies').doc('custom').get(), 2000);
+                if (customDoc && customDoc.exists && Array.isArray(customDoc.data().items)) {
+                    targetCustomTrophies = customDoc.data().items;
+                }
+
+                const unlockedSnap = await withTimeout(db.collection('users').doc(uid).collection('unlocked_items').get(), 2000);
+                if (unlockedSnap) unlockedSnap.forEach(d => { targetState[d.id] = d.data(); });
+            } catch (e) {}
+
+            try {
+                const userPosts = await withTimeout(db.collection('posts').where('uid', '==', uid).get(), 2000);
+                if (userPosts) {
+                    userPosts.forEach(doc => {
+                        const p = doc.data();
+                        if (p.isCircleDoc) return;
+                        if (p.isProfileIndex) {
+                            if (Array.isArray(p.customTrophies)) targetCustomTrophies = p.customTrophies;
+                        } else if (p.trophyId) {
+                            if (!targetState[p.trophyId]) {
+                                targetState[p.trophyId] = {
+                                    date: p.date || '',
+                                    photo: p.photo || null,
+                                    comment: p.comment || '',
+                                    condition: p.condition || '',
+                                    trophyName: p.trophyName || ''
+                                };
+                            } else {
+                                if (!targetState[p.trophyId].condition && p.condition) targetState[p.trophyId].condition = p.condition;
+                                if (!targetState[p.trophyId].trophyName && p.trophyName) targetState[p.trophyId].trophyName = p.trophyName;
+                            }
+
+                            if (String(p.trophyId).startsWith('custom_') && !targetCustomTrophies.find(t => String(t.id) === String(p.trophyId))) {
+                                targetCustomTrophies.push({
+                                    id: p.trophyId,
+                                    name: p.trophyName || 'カスタム実績',
+                                    condition: p.condition || 'タイムラインから検出',
+                                    rank: 'gold',
+                                    isCustom: true
+                                });
+                            }
+                        }
+                    });
+                }
+            } catch (e) {}
+
+            freshTargetData.uid = uid;
+            const allTargetTrophies = [...defaultTrophies, ...targetCustomTrophies];
+            
+            const statsBox = document.getElementById('stats-grid-box');
+            if (statsBox) statsBox.style.display = 'grid';
+            
+            const container = document.getElementById('main-container');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const backRow = document.createElement('div');
+            backRow.style.cssText = 'margin-bottom: 10px;';
+            backRow.innerHTML = `<button class="btn-action-small" onclick="switchMainTab('search')"><i class="fa-solid fa-arrow-left"></i> 検索に戻る</button>`;
+            container.appendChild(backRow);
+
+            const headerBox = document.createElement('div');
+            headerBox.className = 'profile-card-header';
+            
+            const avatarHTML = freshTargetData.avatar 
+                ? `<img src="${freshTargetData.avatar}" class="profile-avatar-large">` 
+                : `<div class="profile-avatar-large"><i class="fa-solid fa-user"></i></div>`;
+
+            const isFollowing = (myProfile.following || []).includes(uid);
+            const followersCount = (freshTargetData.followers || []).length;
+            const followingCount = (freshTargetData.following || []).length;
+
+            headerBox.innerHTML = `
+                ${avatarHTML}
+                <div class="profile-info">
+                    <div class="profile-displayname">${freshTargetData.displayName || freshTargetData.username || 'ユーザー'}</div>
+                    <div class="profile-username">@${freshTargetData.username || 'user'}</div>
+                    <div class="profile-bio">${freshTargetData.bio || 'ステータス未設定'}</div>
+                    <div class="follow-stats-row">
+                        <div>フォロー <span>${followingCount}</span></div>
+                        <div>フォロワー <span id="target-followers-count">${followersCount}</span></div>
+                    </div>
+                    <button class="btn-action-small ${isFollowing ? 'following' : ''}" id="follow-toggle-btn" onclick="toggleFollow('${uid}')">${isFollowing ? 'フォロー中' : 'フォローする'}</button>
+                </div>
+            `;
+            container.appendChild(headerBox);
+
+            const albumTitle = document.createElement('div');
+            albumTitle.style.cssText = 'font-size:0.85rem; font-weight:800; margin-bottom:10px; color:var(--text-primary);';
+            albumTitle.innerHTML = '📸 解除した実績ギャラリー';
+            container.appendChild(albumTitle);
+
+            const grid = document.createElement('div');
+            grid.className = 'gallery-grid-3';
+            grid.style.marginBottom = '20px';
+
+            let photoCount = 0;
+            Object.keys(targetState).forEach(id => {
+                const item = targetState[id];
+                if (item && item.photo) {
+                    photoCount++;
+                    const trophy = allTargetTrophies.find(t => String(t.id) === String(id));
+                    const tName = item.trophyName || (trophy ? trophy.name : '実績');
+                    const tCond = item.condition || (trophy ? trophy.condition : '');
+                    const el = document.createElement('div');
+                    el.className = 'gallery-item';
+                    el.innerHTML = `
+                        <img src="${item.photo}">
+                        <div class="gallery-item-title">${tName}</div>
+                    `;
+                    el.onclick = () => openPhotoLightbox(item.photo, tName, tCond, item.date || '', item.comment || '', null, null);
+                    grid.appendChild(el);
+                }
+            });
+
+            if (photoCount > 0) {
+                container.appendChild(grid);
+            } else {
+                container.innerHTML += '<div style="text-align:center; color:var(--text-secondary); font-size:0.75rem; padding:16px; background:var(--surface-card); border-radius:10px; margin-bottom:16px;">公開されている実績写真はまだありません</div>';
+            }
+
+            const trophyListEl = document.createElement('div');
+            let count = { platinum: 0, gold: 0, silver: 0, bronze: 0 };
+            let totalUnlocked = 0;
+
+            allTargetTrophies.forEach(t => {
+                const isUnlocked = !!targetState[t.id];
+                if (isUnlocked) {
+                    if (count[t.rank] !== undefined) count[t.rank]++;
+                    totalUnlocked++;
+                }
+
+                const card = document.createElement('div');
+                card.className = `trophy-card ${isUnlocked ? 'unlocked' : ''} ${t.isUltimate ? 'ultimate' : ''}`;
+                
+                const iconContent = (isUnlocked && targetState[t.id].photo)
+                    ? `<img src="${targetState[t.id].photo}" alt="Photo">`
+                    : `<i class="fa-solid fa-trophy"></i>`;
+
+                const displayNameStr = t.isCustom ? `✨ ${t.name}` : (t.isUltimate ? `★ ${t.name}` : t.name);
+
+                card.innerHTML = `
+                    <div class="icon-box">${iconContent}</div>
+                    <div class="trophy-info">
+                        <div class="trophy-name">${displayNameStr}</div>
+                        <div class="trophy-condition">${t.condition}</div>
+                        <div class="trophy-meta">
+                            <span class="rank-tag">${t.rank}</span>
+                            ${isUnlocked ? `<span class="unlocked-tag"><i class="fa-solid fa-check"></i> ${targetState[t.id].date}</span>` : ''}
+                        </div>
+                    </div>
+                `;
+                trophyListEl.appendChild(card);
+            });
+
+            container.appendChild(trophyListEl);
+
+            const cp = document.getElementById('count-plat');
+            const cg = document.getElementById('count-gold');
+            const cs = document.getElementById('count-silver');
+            const cb = document.getElementById('count-bronze');
+            if (cp) cp.innerText = count.platinum;
+            if (cg) cg.innerText = count.gold;
+            if (cs) cs.innerText = count.silver;
+            if (cb) cb.innerText = count.bronze;
+
+            const percent = allTargetTrophies.length > 0 ? Math.round((totalUnlocked / allTargetTrophies.length) * 100) : 0;
+            const pp = document.getElementById('progress-percent');
+            if (pp) pp.innerText = `${percent}%`;
+        }
+
+        async function revertUnlock(id) {
+            const trophy = getAllTrophies().find(t => String(t.id) === String(id));
+            const trophyName = trophy ? trophy.name : 'この実績';
+
+            if (!confirm(`「${trophyName}」を解除前の状態（未解除）に戻しますか？`)) return;
+
+            if (userState[id]) {
+                delete userState[id];
+            }
+
+            openUnlockedManageModal();
+            switchMainTab('profile');
+            showNotification(`「${trophyName}」を未解除に戻しました`, 'TROPHY RESET');
+
+            await removeSingleUnlockFromStorage(id);
+        }
+
+        function shareProfile() {
+            const shareData = {
+                title: 'Life Trophies',
+                text: `${myProfile.displayName} (@${myProfile.username}) の人生の実績ボードをチェック！`,
+                url: window.location.href
+            };
+            if (navigator.share) {
+                navigator.share(shareData).catch(() => {});
+            } else {
+                navigator.clipboard.writeText(window.location.href);
+                showNotification('リンクをコピーしました！', 'SHARE');
+            }
+        }
+
+        function sharePost(trophyName, userName) {
+            const shareData = {
+                title: 'Life Trophies',
+                text: `${userName} さんが実績「${trophyName}」を解除しました！`,
+                url: window.location.href
+            };
+            if (navigator.share) {
+                navigator.share(shareData).catch(() => {});
+            } else {
+                navigator.clipboard.writeText(window.location.href);
+                showNotification('投稿リンクをコピーしました！', 'SHARE');
+            }
+        }
+
+        function sendNotification(targetUid, type, message) {
+            if (!currentUser || targetUid === currentUser.uid) return;
+            try {
+                db.collection('users').doc(targetUid).collection('notifications').add({
+                    type: type,
+                    senderUid: currentUser.uid,
+                    senderName: myProfile.displayName || myProfile.username || 'ユーザー',
+                    message: message,
+                    read: false,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                }).catch(()=>{});
+            } catch (e) {}
+        }
+
+        async function checkUnreadNotifications() {
+            if (!currentUser) return;
+            try {
+                const snapshot = await withTimeout(db.collection('users').doc(currentUser.uid).collection('notifications').where('read', '==', false).get(), 2000);
+                const dot = document.getElementById('notif-badge-dot');
+                if (dot) dot.style.display = (snapshot && !snapshot.empty) ? 'block' : 'none';
+            } catch (e) {}
+        }
+
+        async function openNotificationsModal() {
+            const container = document.getElementById('notifications-container');
+            if (!container) return;
+            container.innerHTML = '<div style="text-align:center; color:var(--text-secondary); font-size:0.8rem; padding:20px;">読み込み中...</div>';
+            openModal('notifications-modal');
+
+            try {
+                const snapshot = await withTimeout(db.collection('users').doc(currentUser.uid).collection('notifications').orderBy('createdAt', 'desc').limit(20).get(), 2500);
+                container.innerHTML = '';
+
+                if (!snapshot || snapshot.empty) {
+                    container.innerHTML = '<div style="text-align:center; color:var(--text-secondary); font-size:0.8rem; padding:20px;">通知はありません</div>';
+                    return;
+                }
+
+                const batch = db.batch();
+                snapshot.forEach(doc => {
+                    batch.update(doc.ref, { read: true });
+                    const data = doc.data();
+                    const card = document.createElement('div');
+                    card.className = 'feed-card';
+                    card.style.cssText = 'padding:10px 14px; margin-bottom:8px; font-size:0.75rem;';
+                    card.innerHTML = `<b>${data.senderName}</b> ${data.message}`;
+                    container.appendChild(card);
+                });
+                batch.commit().catch(()=>{});
+                const dot = document.getElementById('notif-badge-dot');
+                if (dot) dot.style.display = 'none';
+            } catch (e) {
+                container.innerHTML = '<div style="text-align:center; color:var(--text-secondary); font-size:0.8rem; padding:20px;">通知はありません</div>';
+            }
+        }
+
+        async function openFollowListModal(type) {
+            const titleEl = document.getElementById('follow-list-title');
+            const listContainer = document.getElementById('follow-list-container');
+            if (!titleEl || !listContainer) return;
+
+            titleEl.innerText = type === 'following' ? 'フォロー中リスト' : 'フォロワーリスト';
+            listContainer.innerHTML = '<div style="text-align:center; color:var(--text-secondary); font-size:0.8rem; padding:20px;">読み込み中...</div>';
+            openModal('follow-list-modal');
+
+            const targetIds = type === 'following' ? myProfile.following : myProfile.followers;
+            if (!targetIds || targetIds.length === 0) {
+                listContainer.innerHTML = '<div style="text-align:center; color:var(--text-secondary); font-size:0.8rem; padding:20px;">ユーザーはいません</div>';
+                return;
+            }
+
+            try {
+                listContainer.innerHTML = '';
+                for (let uid of targetIds) {
+                    const userDoc = await withTimeout(db.collection('users').doc(uid).get(), 2000);
+                    if (userDoc && userDoc.exists) {
+                        const data = userDoc.data();
+                        const avatarHTML = data.avatar 
+                            ? `<img src="${data.avatar}" class="feed-avatar">` 
+                            : `<div class="feed-avatar"><i class="fa-solid fa-user"></i></div>`;
+
+                        const card = document.createElement('div');
+                        card.className = 'feed-card';
+                        card.style.cssText = 'display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; padding:10px 14px; cursor:pointer;';
+                        card.innerHTML = `
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                ${avatarHTML}
+                                <div>
+                                    <div style="font-size:0.85rem; font-weight:700;">${data.displayName || data.username}</div>
+                                    <div style="font-size:0.65rem; color:var(--text-secondary);">@${data.username}</div>
+                                </div>
+                            </div>
+                            <i class="fa-solid fa-chevron-right" style="color:var(--text-secondary); font-size:0.8rem;"></i>
+                        `;
+                        card.onclick = () => {
+                            closeModal('follow-list-modal');
+                            viewUserProfile(uid, data);
+                        };
+                        listContainer.appendChild(card);
+                    }
+                }
+            } catch (e) {
+                listContainer.innerHTML = '<div style="text-align:center; color:var(--text-secondary); font-size:0.8rem; padding:20px;">読み込みに失敗しました</div>';
+            }
+        }
+
+        /* -------------------------------------------------------------
+           フォロー / フォロワー機能 ＆ プロフィール編集関連（完全復活）
+        ------------------------------------------------------------- */
+        async function toggleFollow(targetUid) {
+            if (!currentUser) return;
+            const myUid = currentUser.uid;
+            if (myUid === targetUid) return;
+
+            const isFollowing = (myProfile.following || []).includes(targetUid);
+            const myRef = db.collection('users').doc(myUid);
+            const targetRef = db.collection('users').doc(targetUid);
+
+            const btn = document.getElementById('follow-toggle-btn');
+            const countEl = document.getElementById('target-followers-count');
+
+            if (btn) btn.disabled = true;
+
+            try {
+                let currentFollowersCount = countEl ? parseInt(countEl.innerText) || 0 : 0;
+
+                if (isFollowing) {
+                    myProfile.following = (myProfile.following || []).filter(id => id !== targetUid);
+                    await myRef.set({ following: firebase.firestore.FieldValue.arrayRemove(targetUid) }, { merge: true });
+                    await targetRef.set({ followers: firebase.firestore.FieldValue.arrayRemove(myUid) }, { merge: true });
+                    
+                    if (countEl) countEl.innerText = Math.max(0, currentFollowersCount - 1);
+                    if (btn) {
+                        btn.className = 'btn-action-small';
+                        btn.innerText = 'フォローする';
+                    }
+                    showNotification('フォローを解除しました', 'FOLLOW');
+                } else {
+                    if (!myProfile.following) myProfile.following = [];
+                    myProfile.following.push(targetUid);
+                    await myRef.set({ following: firebase.firestore.FieldValue.arrayUnion(targetUid) }, { merge: true });
+                    await targetRef.set({ followers: firebase.firestore.FieldValue.arrayUnion(myUid) }, { merge: true });
+                    
+                    if (countEl) countEl.innerText = currentFollowersCount + 1;
+                    if (btn) {
+                        btn.className = 'btn-action-small following';
+                        btn.innerText = 'フォロー中';
+                    }
+                    showNotification('フォローしました！', 'FOLLOW');
+                    sendNotification(targetUid, 'follow', 'があなたをフォローしました。');
+                }
+
+                saveProfileToLocalCache(myUid, myProfile);
+            } catch (e) {
+                alert('フォロー処理に失敗しました: ' + e.message);
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        function openEditProfileModal() {
+            document.getElementById('edit-displayname-input').value = myProfile.displayName || myProfile.username || '';
+            document.getElementById('edit-username-input').value = myProfile.username || '';
+            document.getElementById('edit-bio-input').value = myProfile.bio || '';
+            const img = document.getElementById('avatar-preview');
+            if (myProfile.avatar) {
+                img.src = myProfile.avatar;
+                img.style.display = 'block';
+            } else {
+                img.style.display = 'none';
+            }
+            tempAvatarBase64 = myProfile.avatar;
+            openModal('edit-profile-modal');
+        }
+
+        async function previewAvatar(e) {
+            const file = e.target.files[0];
+            if (file) {
+                try {
+                    tempAvatarBase64 = await compressImageFile(file, 300, 0.7);
+                    const img = document.getElementById('avatar-preview');
+                    img.src = tempAvatarBase64;
+                    img.style.display = 'block';
+                } catch (err) {
+                    alert('アイコン画像の処理に失敗しました');
+                }
+            }
+        }
+
+        function saveProfileChanges() {
+            const user = currentUser || auth.currentUser;
+            if (!user) return;
+            const newDisplayName = document.getElementById('edit-displayname-input').value.trim();
+            const newUsername = document.getElementById('edit-username-input').value.trim().replace(/^@/, '');
+            const newBio = document.getElementById('edit-bio-input').value.trim() || "人生の実績解除中！";
+            if (!newDisplayName) return alert('表示名を入力してください');
+            if (!newUsername) return alert('ユーザーIDを入力してください');
+
+            myProfile.uid = user.uid;
+            myProfile.email = user.email || myProfile.email || "";
+            myProfile.displayName = newDisplayName;
+            myProfile.username = newUsername;
+            myProfile.bio = newBio;
+            myProfile.avatar = tempAvatarBase64;
+
+            saveProfileToLocalCache(user.uid, myProfile);
+
+            closeModal('edit-profile-modal');
+            switchMainTab('profile');
+            showNotification('プロフィールを更新しました', 'PROFILE UPDATED');
+
+            syncProfileToCloudBackground(user.uid, myProfile);
+        }
+
+        function openModal(id) {
+            const m = document.getElementById(id);
+            if (m) m.classList.add('active');
+        }
+        function closeModal(id) {
+            const m = document.getElementById(id);
+            if (m) m.classList.remove('active');
+        }
+
+        function showNotification(title, subtitle = 'Trophy Unlocked') {
             const notif = document.getElementById('notification');
+            if (!notif) return;
+            document.getElementById('notif-subtitle').innerText = subtitle;
             document.getElementById('notif-title').innerText = title;
             notif.classList.add('show');
-
-            setTimeout(() => {
-                notif.classList.remove('show');
-            }, 3500);
+            if (notifTimer) clearTimeout(notifTimer);
+            notifTimer = setTimeout(() => notif.classList.remove('show'), 3500);
         }
-
-        renderTrophies();
     </script>
 </body>
 </html>
