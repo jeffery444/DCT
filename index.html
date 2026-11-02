@@ -184,10 +184,11 @@
             <div class="modal-title" id="auth-title">ログイン</div>
             <!-- actionやmethod、適切なautocompleteを付与することでブラウザがパスワードを認識します -->
             <form onsubmit="event.preventDefault(); handleAuth();" autocomplete="on">
-                <input type="email" id="auth-email" class="form-input" placeholder="メールアドレス" autocomplete="username" required>
+                <input type="text" id="auth-email" class="form-input" placeholder="メールアドレス または ユーザーID" autocomplete="username" autocapitalize="none" required>
                 <input type="password" id="auth-password" class="form-input" placeholder="パスワード (6文字以上)" autocomplete="current-password" required>
                 <button type="submit" class="modal-btn" id="auth-submit-btn">ログイン</button>
             </form>
+
             <div style="text-align:center; margin-top:14px; font-size:0.75rem; color:var(--text-secondary); cursor:pointer; padding:6px;" id="auth-switch-text" onclick="toggleAuthMode()">アカウントをお持ちでない方は新規登録</div>
         </div>
     </div>
@@ -203,7 +204,7 @@
             <div id="setup-email-display" style="font-size: 0.70rem; color: var(--text-secondary); background: var(--surface-hover); padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; text-align: center; word-break: break-all;"></div>
             <input type="text" id="displayname-input" class="form-input" placeholder="表示名 (例: てるあき)">
             <input type="text" id="username-input" class="form-input" placeholder="ユーザーID・半角英数 (例: HR_40)">
-            <input type="text" id="bio-input" class="form-input" placeholder="ステータスメッセージ (例: 人生の実績解除中！)">
+            <input type="text" id="bio-input" class="form-input" placeholder="ステータスメッセージ (例: 実績解除中！)">
             <button type="button" class="modal-btn" id="save-initial-profile-btn" onclick="saveInitialProfile()">設定を完了して始める</button>
             <button type="button" class="modal-btn btn-cancel" style="margin-top: 10px; font-size: 0.75rem;" onclick="logout()">別のアカウントでログインし直す</button>
         </div>
