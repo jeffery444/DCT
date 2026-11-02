@@ -178,18 +178,20 @@
 </head>
 <body>
 
-    <!-- Auth Modal -->
+        <!-- Auth Modal -->
     <div class="modal" id="auth-modal">
         <div class="modal-content">
             <div class="modal-title" id="auth-title">ログイン</div>
-            <form onsubmit="event.preventDefault(); handleAuth();" autocomplete="off">
-                <input type="email" id="auth-email" class="form-input" placeholder="メールアドレス" autocomplete="off">
-                <input type="password" id="auth-password" class="form-input" placeholder="パスワード (6文字以上)" autocomplete="new-password">
+            <!-- actionやmethod、適切なautocompleteを付与することでブラウザがパスワードを認識します -->
+            <form onsubmit="event.preventDefault(); handleAuth();" autocomplete="on">
+                <input type="email" id="auth-email" class="form-input" placeholder="メールアドレス" autocomplete="username" required>
+                <input type="password" id="auth-password" class="form-input" placeholder="パスワード (6文字以上)" autocomplete="current-password" required>
                 <button type="submit" class="modal-btn" id="auth-submit-btn">ログイン</button>
             </form>
             <div style="text-align:center; margin-top:14px; font-size:0.75rem; color:var(--text-secondary); cursor:pointer; padding:6px;" id="auth-switch-text" onclick="toggleAuthMode()">アカウントをお持ちでない方は新規登録</div>
         </div>
     </div>
+
 
     <!-- Initial Profile Setup Modal -->
     <div class="modal" id="username-modal">
@@ -948,41 +950,91 @@
             syncProfileToCloudBackground(uid, profileData);
         }
 
-        function toggleAuthMode() {
+                function toggleAuthMode() {
             isSignUpMode = !isSignUpMode;
             document.getElementById('auth-title').innerText = isSignUpMode ? '新規アカウント登録' : 'ログイン';
             document.getElementById('auth-submit-btn').innerText = isSignUpMode ? '登録する' : 'ログイン';
             document.getElementById('auth-switch-text').innerText = isSignUpMode ? 'すでにアカウントをお持ちの方はログイン' : 'アカウントをお持ちでない方は新規登録';
+            
+            const inputField = document.getElementById('auth-email');
+            if (inputField) {
+                inputField.placeholder = isSignUpMode ? 'メールアドレス' : 'メールアドレス または ユーザーID';
+            }
         }
 
         async function handleAuth() {
             if (isAuthProcessing) return;
-            const email = document.getElementById('auth-email').value.trim();
+            const inputVal = document.getElementById('auth-email').value.trim();
             const password = document.getElementById('auth-password').value;
             const submitBtn = document.getElementById('auth-submit-btn');
-            if (!email || !password) return alert('メールアドレスとパスワードを入力してください');
+
+            if (!inputVal || !password) return alert('メールアドレス（またはユーザーID）とパスワードを入力してください');
             if (password.length < 6) return alert('パスワードは6文字以上で入力してください');
-            isAuthProcessing = true; submitBtn.disabled = true; submitBtn.innerText = '認証中...';
+
+            isAuthProcessing = true; 
+            submitBtn.disabled = true; 
+            submitBtn.innerText = '認証中...';
+
             try {
                 if (isSignUpMode) {
-                    const cred = await auth.createUserWithEmailAndPassword(email, password);
-                    currentUser = cred.user; closeModal('auth-modal'); openInitialProfileSetupModal();
+                    // 新規登録時はメールアドレスが必須
+                    if (!inputVal.includes('@')) {
+                        throw new Error('新規登録にはメールアドレスを入力してください。');
+                    }
+                    const cred = await auth.createUserWithEmailAndPassword(inputVal, password);
+                    currentUser = cred.user; 
+                    closeModal('auth-modal'); 
+                    openInitialProfileSetupModal();
                 } else {
-                    await auth.signInWithEmailAndPassword(email, password);
+                    // ログイン時：入力値がメールアドレス形式か判定、違えばユーザーIDとして逆引き
+                    let loginEmail = inputVal;
+                    if (!inputVal.includes('@')) {
+                        const cleanId = inputVal.replace(/^@/, '').toLowerCase();
+                        submitBtn.innerText = 'IDを確認中...';
+                        
+                        try {
+                            // Firestoreから該当するユーザーIDのドキュメントを検索
+                            const userSnap = await withTimeout(db.collection('users').where('searchUsername', '==', cleanId).limit(1).get(), 2500);
+                            if (userSnap && !userSnap.empty) {
+                                loginEmail = userSnap.docs[0].data().email;
+                            } else {
+                                // 投稿インデックスからも探す
+                                const idxSnap = await withTimeout(db.collection('posts').where('searchUsername', '==', cleanId).limit(1).get(), 2000);
+                                if (idxSnap && !idxSnap.empty) {
+                                    loginEmail = idxSnap.docs[0].data().email;
+                                }
+                            }
+                        } catch (e) {}
+
+                        if (!loginEmail || !loginEmail.includes('@')) {
+                            throw new Error(`ユーザーID「@${cleanId}」に一致するアカウントが見つかりませんでした。メールアドレスでログインするか、正しいIDを入力してください。`);
+                        }
+                    }
+
+                    submitBtn.innerText = 'ログイン中...';
+                    await auth.signInWithEmailAndPassword(loginEmail, password);
                 }
             } catch (error) {
                 if (isSignUpMode && error.code === 'auth/email-already-in-use') {
-                    try { await auth.signInWithEmailAndPassword(email, password); return; }
-                    catch (e) {
-                        alert(`メールアドレス「${email}」は既に登録されています。ログイン画面に切り替えます。`);
-                        isSignUpMode = false; toggleAuthMode(); isSignUpMode = false;
+                    try { 
+                        await auth.signInWithEmailAndPassword(inputVal, password); 
+                        return; 
+                    } catch (e) {
+                        alert(`メールアドレス「${inputVal}」は既に登録されています。ログイン画面に切り替えます。`);
+                        isSignUpMode = false; 
+                        toggleAuthMode(); 
+                        isSignUpMode = false;
                     }
-                } else { alert('認証エラー: ' + error.message); }
+                } else {
+                    alert('認証エラー: ' + error.message);
+                }
             } finally {
-                isAuthProcessing = false; submitBtn.disabled = false;
+                isAuthProcessing = false; 
+                submitBtn.disabled = false;
                 submitBtn.innerText = isSignUpMode ? '登録する' : 'ログイン';
             }
         }
+
 
         async function logout() { closeModal('settings-modal'); closeModal('username-modal'); await auth.signOut(); }
 
