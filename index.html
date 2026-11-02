@@ -196,7 +196,7 @@
     <!-- Initial Profile Setup Modal -->
     <div class="modal" id="username-modal">
         <div class="modal-content">
-            <div class="modal-title">✨ プロフィール初期設定</div>
+            <div class="modal-title"> プロフィール初期設定</div>
             <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 14px; text-align: center; line-height: 1.4;">
                 アカウント作成ありがとうございます！<br>検索やタイムラインで使用する<b>表示名</b>と<b>ユーザーID</b>を設定してください。
             </div>
@@ -293,7 +293,7 @@
             </div>
 
             <div id="lightbox-delete-container" style="margin-bottom: 12px; display: none;">
-                <button class="delete-btn" id="lightbox-delete-post-btn" style="width: 100%; padding: 10px; font-size: 0.8rem;">🗑️ このタイムライン投稿を削除する</button>
+                <button class="delete-btn" id="lightbox-delete-post-btn" style="width: 100%; padding: 10px; font-size: 0.8rem;">🗑️ この投稿を削除する</button>
             </div>
             <button class="modal-btn btn-cancel" onclick="closeModal('photo-lightbox-modal')">閉じる</button>
         </div>
@@ -339,7 +339,7 @@
     <!-- Create Circle Modal (例文変更＆参加方式選択対応) -->
     <div class="modal" id="create-circle-modal">
         <div class="modal-content">
-            <div class="modal-title">⭕ サークルを立ち上げる</div>
+            <div class="modal-title"> サークルを立ち上げる</div>
             <input type="text" id="circle-name-input" class="form-input" placeholder="サークル名 (例: 我らの団)">
             <textarea id="circle-bio-input" class="form-textarea" placeholder="サークル自己紹介 (例: 謎の鱗の正体を追ってくれる団員募集！)"></textarea>
             <div style="font-size:0.75rem; font-weight:700; color:var(--text-secondary); margin-bottom:6px;">参加ルール（後から変更可能）</div>
@@ -357,9 +357,9 @@
     <!-- Create Circle Trophy Modal -->
     <div class="modal" id="circle-trophy-modal">
         <div class="modal-content">
-            <div class="modal-title">⭕ サークル実績を作成</div>
-            <input type="text" id="circle-trophy-title" class="form-input" placeholder="実績タイトル (例: 初プルリク達成)">
-            <input type="text" id="circle-trophy-condition" class="form-input" placeholder="達成条件 (例: GitHubにPRを送る)">
+            <div class="modal-title"> サークル実績を作成</div>
+            <input type="text" id="circle-trophy-title" class="form-input" placeholder="実績タイトル (例: 赤衣の男)">
+            <input type="text" id="circle-trophy-condition" class="form-input" placeholder="達成条件 (例: 大いなる存在との繋がりを匂わせる)">
             <select id="circle-trophy-rank" class="form-select">
                 <option value="bronze">BRONZE (銅)</option>
                 <option value="silver">SILVER (銀)</option>
@@ -486,23 +486,24 @@
             { id: 14, name: '伝説の目撃者', condition: '現地でプロのモータースポーツやプロスポーツの決勝を観戦する', rank: 'gold' },
             { id: 15, name: 'Bullet', condition: '日帰りまたは0泊で海外へ行く', rank: 'gold' },
             { id: 16, name: '本物の勝負師', condition: '合法的なカジノで遊ぶ', rank: 'gold' },
-            { id: 17, name: 'ダイヤモンドは砕けない', condition: 'ダイヤモンド製品を購入する', rank: 'gold' },
-            { id: 18, name: 'スティールボールラン', condition: '馬に乗る', rank: 'silver' },
-            { id: 19, name: 'なにわの商人', condition: '家電量販店で値引きを交渉をして割引をしてもらう', rank: 'silver' },
-            { id: 20, name: 'デジタルデトックス', condition: '見知らぬ人に教えを請う', rank: 'silver' },
-            { id: 21, name: 'ポーカーフェイスドロップ', condition: 'ジェットコースターで叫ばない', rank: 'silver' },
-            { id: 22, name: '明けの明星', condition: '始発で出かける', rank: 'silver' },
-            { id: 23, name: 'グローバル化社会', condition: 'TOEICを受ける', rank: 'silver' },
-            { id: 24, name: '寒風の半袖ファイター', condition: '気温が10℃を下回ってる日に半袖で出かける', rank: 'silver' },
-            { id: 25, name: 'ストライカー', condition: 'シュートを決める', rank: 'silver' },
-            { id: 26, name: '銀世界', condition: 'ウインタースポーツで遊ぶ', rank: 'silver' },
-            { id: 27, name: '栄養学', condition: '厚生労働省が定める日本人の食事摂取基準を満たした食事を1日摂る', rank: 'silver' },
-            { id: 28, name: 'ALL OUT', condition: '筋力トレーニングでプロテインシェイカーが振れないほど追い込む', rank: 'silver' },
-            { id: 29, name: '成功者', condition: '平日の昼間にジムに行く', rank: 'silver' },
-            { id: 30, name: 'ナイトクルーズ', condition: '夜行バスで500km以上移動する', rank: 'silver' },
-            { id: 31, name: '大悪党', condition: 'その場にいる全員を騙し、後でネタバラシをする', rank: 'silver' },
-            { id: 32, name: '創作料理人', condition: 'レシピを見ずに美味しい料理を作る', rank: 'silver' },
-            { id: 33, name: '気分は監督', condition: '映画館で自分以外の観客がいない状態で映画を見る', rank: 'silver' },
+            { id: 17, name: 'ダイヤモンドは砕けない', condition: 'ダイヤモンド製品を購入する', rank: 'gold' },   
+            { id: 18, name: 'アルテマ', condition: '大掃除や断捨離で自分に不要なものを完全処分する', rank: 'gold' },
+            { id: 19, name: 'スティールボールラン', condition: '馬に乗る', rank: 'silver' },
+            { id: 20, name: 'なにわの商人', condition: '家電量販店で値引きを交渉をして割引をしてもらう', rank: 'silver' },
+            { id: 21, name: 'デジタルデトックス', condition: '見知らぬ人に教えを請う', rank: 'silver' },
+            { id: 22, name: 'ポーカーフェイスドロップ', condition: 'ジェットコースターで叫ばない', rank: 'silver' },
+            { id: 23, name: '明けの明星', condition: '始発で出かける', rank: 'silver' },
+            { id: 24, name: 'グローバル化社会', condition: 'TOEICを受ける', rank: 'silver' },
+            { id: 25, name: '寒風の半袖ファイター', condition: '気温が10℃を下回ってる日に半袖で出かける', rank: 'silver' },
+            { id: 26, name: 'ストライカー', condition: 'シュートを決める', rank: 'silver' },
+            { id: 27, name: '銀世界', condition: 'ウインタースポーツで遊ぶ', rank: 'silver' },
+            { id: 28, name: '栄養学', condition: '厚生労働省が定める日本人の食事摂取基準を満たした食事を1日摂る', rank: 'silver' },
+            { id: 29, name: 'ALL OUT', condition: '筋力トレーニングでプロテインシェイカーが振れないほど追い込む', rank: 'silver' },
+            { id: 30, name: '成功者', condition: '平日の昼間にジムに行く', rank: 'silver' },
+            { id: 31, name: 'ナイトクルーズ', condition: '夜行バスで500km以上移動する', rank: 'silver' },
+            { id: 32, name: '大悪党', condition: 'その場にいる全員を騙し、後でネタバラシをする', rank: 'silver' },
+            { id: 33, name: '創作料理人', condition: 'レシピを見ずに美味しい料理を作る', rank: 'silver' },
+            { id: 91, name: '気分は監督', condition: '映画館で自分以外の観客がいない状態で映画を見る', rank: 'silver' },
             { id: 34, name: '東海道中膝栗毛', condition: '東京大阪間を自動車で移動する', rank: 'silver' },
             { id: 35, name: '不屈の意志', condition: '継続していた悪癖を止める', rank: 'silver' },
             { id: 36, name: '現金主義', condition: '新品の携帯電話を一括で購入', rank: 'silver' },
@@ -529,6 +530,7 @@
             { id: 52, name: '電池切れ？', condition: '道に迷う', rank: 'bronze' },
             { id: 53, name: '直属のディナー', condition: '上司と2人で食事に行く', rank: 'bronze' },
             { id: 54, name: '野人', condition: '2日間風呂に入らない', rank: 'bronze' },
+            { id: 94, name: 'ゴールドソーサーの勝者', condition: 'ゲームセンターのクレーンゲームやアーケードゲームで景品をGETする', rank: 'bronze' },
             { id: 55, name: '水面の旅人', condition: '雨の日に散歩をする', rank: 'bronze' },
             { id: 56, name: '大金の重み', condition: '10万円以上の現金を引き出す', rank: 'bronze' },
             { id: 57, name: '博打打ち', condition: '公営ギャンブルで勝利する', rank: 'bronze' },
@@ -557,6 +559,7 @@
             { id: 86, name: '知識の証明', condition: 'なんらかの国家資格または検定試験に合格する', rank: 'bronze' },
             { id: 87, name: '文字通り', condition: 'セブンイレブンにて税込711円ピッタリ買い物をする', rank: 'bronze' },
             { id: 88, name: 'スプリント！', condition: '全力疾走して自分の50m走のタイムを計測する', rank: 'bronze' },
+            { id: 92, name: '星を救う者', condition: '街のゴミ拾いを行うまたは、エコ活動に参加する', rank: 'bronze' },
             { id: 89, name: '夜のピクニック', condition: '天体観測に行く', rank: 'bronze' },
             { id: 90, name: 'ルーティンブレイカー', condition: 'よく行く飲食店で一度も頼んだことのないメニューを注文する', rank: 'bronze' }
         ];
