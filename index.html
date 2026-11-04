@@ -222,6 +222,107 @@
             background: var(--surface-hover);
         }
     </style>
+            /* --- v1.3 追加スタイル（お気に入り・ジャンル・進捗・時系列ギャラリー） --- */
+        .category-tabs-5 {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 3px;
+            margin-bottom: 14px;
+            background: var(--surface-card);
+            padding: 4px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+        }
+        .fav-star-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-tertiary);
+            font-size: 1.1rem;
+            cursor: pointer;
+            padding: 6px;
+            transition: transform 0.15s, color 0.15s;
+            pointer-events: auto !important;
+        }
+        .fav-star-btn.active {
+            color: var(--rank-gold);
+        }
+        .fav-star-btn:active {
+            transform: scale(1.25);
+        }
+        .genre-tag {
+            font-size: 0.58rem;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: var(--surface-hover);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+        .progress-count-tag {
+            font-size: 0.6rem;
+            font-weight: 700;
+            color: #30d158;
+            background: rgba(48, 209, 88, 0.12);
+            border: 1px solid rgba(48, 209, 88, 0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .mode-switch-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+        .mode-switch-btn {
+            padding: 10px 8px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--surface-hover);
+            color: var(--text-secondary);
+            font-size: 0.78rem;
+            font-weight: 800;
+            cursor: pointer;
+            text-align: center;
+            pointer-events: auto !important;
+        }
+        .mode-switch-btn.active-unlock {
+            background: var(--text-primary);
+            color: var(--bg-main);
+            border-color: var(--text-primary);
+        }
+        .mode-switch-btn.active-progress {
+            background: rgba(48, 209, 88, 0.18);
+            color: var(--accent-green);
+            border-color: var(--accent-green);
+        }
+        .timeline-step-card {
+            background: var(--surface-hover);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 14px;
+            text-align: left;
+            position: relative;
+        }
+        .timeline-step-badge {
+            display: inline-block;
+            font-size: 0.62rem;
+            font-weight: 800;
+            padding: 3px 8px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+        }
+        .timeline-step-badge.progress {
+            background: rgba(48, 209, 88, 0.15);
+            color: var(--accent-green);
+            border: 1px solid rgba(48, 209, 88, 0.35);
+        }
+        .timeline-step-badge.unlocked {
+            background: rgba(255, 215, 0, 0.15);
+            color: var(--rank-gold);
+            border: 1px solid rgba(255, 215, 0, 0.35);
+        }
+
 </head>
 <body>
 
@@ -241,7 +342,7 @@
     <!-- Initial Profile Setup Modal -->
     <div class="modal" id="username-modal">
         <div class="modal-content">
-            <div class="modal-title">✨ プロフィール初期設定</div>
+            <div class="modal-title"> プロフィール初期設定</div>
             <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 14px; text-align: center; line-height: 1.4;">
                 アカウント作成ありがとうございます！<br>検索やタイムラインで使用する<b>表示名</b>と<b>ユーザーID</b>を設定してください。
             </div>
@@ -330,30 +431,24 @@
         </div>
     </div>
 
-    <!-- Photo / Video Lightbox / Detail Zoom Modal -->
+        <!-- Photo / Video Lightbox / 時系列ヒストリーモーダル -->
     <div class="modal" id="photo-lightbox-modal" onclick="closeModal('photo-lightbox-modal')">
-        <div class="modal-content" onclick="event.stopPropagation()" style="text-align: center; max-width: 440px;">
-            <div class="modal-title" id="lightbox-title" style="margin-bottom: 10px; font-size: 0.95rem;">実績詳細</div>
-            <img id="lightbox-image" style="width: 100%; max-height: 280px; object-fit: cover; border-radius: 10px; margin-bottom: 12px; display: none;" alt="Zoomed Photo">
-            <video id="lightbox-video" style="width: 100%; max-height: 280px; object-fit: cover; border-radius: 10px; margin-bottom: 12px; display: none; background: #000;" controls playsinline loop></video>
-            <div id="lightbox-condition" style="font-size: 0.75rem; color: var(--text-primary); background: var(--surface-hover); padding: 8px 12px; border-radius: 6px; margin-bottom: 8px; text-align: left; font-weight: 700;"></div>
-            <div id="lightbox-date" style="font-size: 0.7rem; color: var(--text-secondary); margin-bottom: 8px;"></div>
-            <div id="lightbox-comment" style="font-size: 0.82rem; background: var(--surface-hover); padding: 10px 12px; border-radius: 8px; margin-bottom: 12px; text-align: left; line-height: 1.4; word-break: break-word;"></div>
-            
-            <div id="lightbox-social-section" style="background: var(--surface-hover); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; margin-bottom: 14px; text-align: left;">
-                <div style="display:flex; align-items:center; gap:14px; font-size:0.8rem; font-weight:700; margin-bottom:8px; border-bottom:1px solid var(--border-color); padding-bottom:6px;">
-                    <span style="color:var(--accent-red);"><i class="fa-solid fa-heart"></i> いいね <span id="lightbox-likes-count">0</span>件</span>
-                    <span style="color:var(--text-secondary);"><i class="fa-solid fa-comment"></i> コメント <span id="lightbox-comments-count">0</span>件</span>
-                </div>
-                <div id="lightbox-comments-list" style="max-height:130px; overflow-y:auto; font-size:0.75rem;"></div>
+        <div class="modal-content" onclick="event.stopPropagation()" style="display:flex; flex-direction:column; max-width: 440px; max-height: 84vh; padding: 0; overflow: hidden;">
+            <div class="modal-header-fixed">
+                <div class="modal-title" id="lightbox-title" style="margin-bottom: 0; font-size: 0.92rem; text-align: left;">実績詳細</div>
+                <button class="header-icon-btn" onclick="closeModal('photo-lightbox-modal')" style="font-size: 1.1rem; padding: 4px;"><i class="fa-solid fa-xmark"></i></button>
             </div>
-
-            <div id="lightbox-delete-container" style="margin-bottom: 12px; display: none;">
-                <button class="delete-btn" id="lightbox-delete-post-btn" style="width: 100%; padding: 10px; font-size: 0.8rem;">🗑️ この投稿を削除する</button>
+            <div class="modal-body-scrollable" id="lightbox-scroll-body">
+                <div id="lightbox-condition" style="font-size: 0.75rem; color: var(--text-primary); background: var(--surface-hover); padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; text-align: left; font-weight: 700;"></div>
+                <!-- ここに進捗1 → 進捗2 → 解除！の時系列カードが順番に並びます -->
+                <div id="lightbox-timeline-container"></div>
             </div>
-            <button class="modal-btn btn-cancel" onclick="closeModal('photo-lightbox-modal')">閉じる</button>
+            <div class="modal-footer-fixed">
+                <button class="modal-btn btn-cancel" onclick="closeModal('photo-lightbox-modal')" style="margin-top: 0;">閉じる</button>
+            </div>
         </div>
     </div>
+
 
     <!-- Follow / Follower List Modal (ヘッダー・閉じるボタン常時固定) -->
     <div class="modal" id="follow-list-modal" onclick="closeModal('follow-list-modal')">
@@ -439,25 +534,33 @@
         </div>
     </div>
 
-    <!-- Unlock Modal -->
+        <!-- Unlock / Progress Modal (解除 or 進捗記録 選択対応) -->
     <div class="modal" id="unlock-modal">
         <div class="modal-content">
-            <div class="modal-title" id="modal-trophy-title">実績を解除</div>
+            <div class="modal-title" id="modal-trophy-title">実績を記録</div>
+            <div class="mode-switch-group">
+                <button type="button" class="mode-switch-btn active-unlock" id="mode-btn-unlock" onclick="setUnlockModalMode('unlock')">🏆 実績を解除する</button>
+                <button type="button" class="mode-switch-btn" id="mode-btn-progress" onclick="setUnlockModalMode('progress')">🗺️ 進捗を記録する</button>
+            </div>
+            <div id="unlock-mode-desc" style="font-size: 0.7rem; color: var(--text-secondary); text-align: center; margin-bottom: 12px;">
+                条件を達成！トロフィーを獲得してタイムラインに投稿しよう。
+            </div>
             <div class="photo-upload-zone" id="unlock-photo-zone" onclick="document.getElementById('photo-input').click()">
                 <i class="fa-solid fa-photo-film" style="font-size: 1.5rem; color: var(--text-secondary); margin-bottom: 8px;"></i>
-                <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-primary);" id="photo-upload-label">📸 証拠写真 または 動画を選択 (必須)</div>
+                <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-primary);" id="photo-upload-label">📸 写真 または 動画を選択 (必須)</div>
                 <div style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 4px;">※動画の場合は<b>5秒まで</b>（写真または動画の添付が必須です）</div>
             </div>
             <img id="photo-preview" class="photo-preview" alt="Preview">
             <video id="video-preview" class="photo-preview" controls playsinline muted loop></video>
             <input type="file" id="photo-input" accept="image/*,video/*" style="display: none;" onchange="previewImage(event)">
-            <textarea id="unlock-comment-input" class="form-textarea" placeholder="思い出や感想のコメントを残す（任意）"></textarea>
+            <textarea id="unlock-comment-input" class="form-textarea" placeholder="思い出や進捗のコメントを残す（任意）"></textarea>
             <div class="modal-buttons">
                 <button class="modal-btn btn-cancel" onclick="closeModal('unlock-modal')">キャンセル</button>
                 <button class="modal-btn" id="confirm-unlock-btn" onclick="confirmUnlock()">解除する</button>
             </div>
         </div>
     </div>
+
 
     <!-- Header -->
     <header>
@@ -513,9 +616,10 @@
         const auth = firebase.auth();
         const db = firebase.firestore();
 
-        let currentUser = null;
+                let currentUser = null;
         let userState = {};
-        let myProfile = { uid: "", email: "", displayName: "", username: "", bio: "", avatar: "", theme: "dark", privacy: "public", following: [], followers: [], joinedCircles: [] };
+        let myProfile = { uid: "", email: "", displayName: "", username: "", bio: "", avatar: "", theme: "dark", privacy: "public", following: [], followers: [], joinedCircles: [], favoriteTrophies: [] };
+        let favoriteTrophyIds = [];
         let customTrophies = [];
         let circleTrophies = [];
         let activeCircles = [];
@@ -527,108 +631,120 @@
         let isSignUpMode = false;
         let isAuthProcessing = false;
         let selectedTrophyId = null;
+        let unlockModalMode = 'unlock'; // 'unlock' または 'progress'
         let activeTab = 'trophies';
         let boardCategory = 'default';
         let trophyFilter = 'all';
+        let trophyGenreFilter = 'all';
         let tempAvatarBase64 = "";
         let tempUnlockPhotoBase64 = "";
         let isMediaProcessing = false;
         let notifTimer = null;
 
+        const genreLabels = {
+            all: '📂 すべて',
+            challenge: '🔥 チャレンジ',
+            play: '🎮 遊び・趣味',
+            travel: '✈️ お出かけ・旅',
+            daily: '🍽️ グルメ・日常',
+            special: '✨ ネタ・ロマン'
+        };
+
         const defaultTrophies = [
-            { id: 1, name: '夢、叶えし者', condition: '夢を叶える', rank: 'platinum', isUltimate: true },
-            { id: 2, name: 'バイリンガル', condition: 'TOEICで満点を取る', rank: 'gold' },
-            { id: 3, name: '言語学者', condition: '漢検一級を取得', rank: 'gold' },
-            { id: 4, name: 'Off the wall', condition: 'ベンチプレス100kgをクリア', rank: 'gold' },
-            { id: 5, name: 'なにわの怪人', condition: '大阪環状線を徒歩で一周する', rank: 'gold' },
-            { id: 6, name: '江戸の傾奇者', condition: '山手線を徒歩で一周する', rank: 'gold' },
-            { id: 7, name: '孤独のファンタジー', condition: '1人で遊園地に行く', rank: 'gold' },
-            { id: 8, name: '国境なき絆', condition: '海外の友人を作る', rank: 'gold' },
-            { id: 9, name: '紳士の洗礼', condition: 'クリケットを行う', rank: 'gold' },
-            { id: 10, name: '空の王者', condition: 'パラグライダーまたはスカイダイビングを体験する。', rank: 'gold' },
-            { id: 11, name: '大海の覇者', condition: 'マリンスポーツで遊ぶ', rank: 'gold' },
-            { id: 12, name: '完全制覇', condition: 'お気に入り飲食店のメニューを全て食べた。', rank: 'gold' },
-            { id: 13, name: 'デビュー待ち', condition: 'カラオケで100点を叩き出す', rank: 'gold' },
-            { id: 14, name: '伝説の目撃者', condition: '現地でプロのモータースポーツやプロスポーツの決勝を観戦する', rank: 'gold' },
-            { id: 15, name: 'Bullet', condition: '日帰りまたは0泊で海外へ行く', rank: 'gold' },
-            { id: 16, name: '本物の勝負師', condition: '合法的なカジノで遊ぶ', rank: 'gold' },
-            { id: 17, name: 'ダイヤモンドは砕けない', condition: 'ダイヤモンド製品を購入する', rank: 'gold' },   
-            { id: 18, name: 'アルテマ', condition: '大掃除や断捨離で自分に不要なものを完全処分する', rank: 'gold' },
-            { id: 19, name: 'スティールボールラン', condition: '馬に乗る', rank: 'silver' },
-            { id: 20, name: 'なにわの商人', condition: '家電量販店で値引きを交渉をして割引をしてもらう', rank: 'silver' },
-            { id: 21, name: 'デジタルデトックス', condition: '見知らぬ人に教えを請う', rank: 'silver' },
-            { id: 22, name: 'ポーカーフェイスドロップ', condition: 'ジェットコースターで叫ばない', rank: 'silver' },
-            { id: 23, name: '明けの明星', condition: '始発で出かける', rank: 'silver' },
-            { id: 24, name: 'グローバル化社会', condition: 'TOEICを受ける', rank: 'silver' },
-            { id: 25, name: '寒風の半袖ファイター', condition: '気温が10℃を下回ってる日に半袖で出かける', rank: 'silver' },
-            { id: 26, name: 'ストライカー', condition: 'シュートを決める', rank: 'silver' },
-            { id: 27, name: '銀世界', condition: 'ウインタースポーツで遊ぶ', rank: 'silver' },
-            { id: 28, name: '栄養学', condition: '厚生労働省が定める日本人の食事摂取基準を満たした食事を1日摂る', rank: 'silver' },
-            { id: 29, name: 'ALL OUT', condition: '筋力トレーニングでプロテインシェイカーが振れないほど追い込む', rank: 'silver' },
-            { id: 30, name: '成功者', condition: '平日の昼間にジムに行く', rank: 'silver' },
-            { id: 31, name: 'ナイトクルーズ', condition: '夜行バスで500km以上移動する', rank: 'silver' },
-            { id: 32, name: '大悪党', condition: 'その場にいる全員を騙し、後でネタバラシをする', rank: 'silver' },
-            { id: 33, name: '創作料理人', condition: 'レシピを見ずに美味しい料理を作る', rank: 'silver' },
-            { id: 91, name: '気分は監督', condition: '映画館で自分以外の観客がいない状態で映画を見る', rank: 'silver' },
-            { id: 34, name: '東海道中膝栗毛', condition: '東京大阪間を自動車で移動する', rank: 'silver' },
-            { id: 35, name: '不屈の意志', condition: '継続していた悪癖を止める', rank: 'silver' },
-            { id: 36, name: '現金主義', condition: '新品の携帯電話を一括で購入', rank: 'silver' },
-            { id: 37, name: '伝説の始まり', condition: 'ホームランを打つ', rank: 'silver' },
-            { id: 38, name: '手中', condition: '高層階に宿泊', rank: 'silver' },
-            { id: 39, name: 'この日のために', condition: '大勢の前でダンスを披露する', rank: 'silver' },
-            { id: 40, name: '拡散よろしく！', condition: 'イベントでコスプレをする', rank: 'silver' },
-            { id: 41, name: 'のんびりスローライフ', condition: '無人島に上陸する', rank: 'silver' },
-            { id: 79, name: '重力への叛逆', condition: '懸垂を20回連続で行う', rank: 'silver' },
-            { id: 80, name: 'マイナスイオンが段違い', condition: '日本三大名瀑のうちいずれかを訪れる', rank: 'silver' },
-            { id: 81, name: '時空を超えた読書家', condition: '国立国会図書館に足を運び、資料を閲覧する', rank: 'silver' },
-            { id: 82, name: 'まだ見ぬ秘湯を求めて', condition: '日本三大古湯または日本三大名泉のいずれかに入浴する', rank: 'silver' },
-            { id: 83, name: 'ここで一句', condition: '日本三景のうちいずれかを見る', rank: 'silver' },
-            { id: 42, name: 'あの夏の思い出', condition: 'カブト虫を捕まえる', rank: 'bronze' },
-            { id: 43, name: '秘密のストライク', condition: 'ボウリングでストライクを取る', rank: 'bronze' },
-            { id: 44, name: 'ブルズアイ', condition: 'ダーツでブルに入れる', rank: 'bronze' },
-            { id: 45, name: '井の中の蛙', condition: '海に行く', rank: 'bronze' },
-            { id: 46, name: '熱狂の観客席', condition: 'スポーツ観戦をする', rank: 'bronze' },
-            { id: 47, name: '孤高の肉食獣', condition: '1人で焼肉に行く', rank: 'bronze' },
-            { id: 48, name: 'モフモフフレンドリー', condition: '散歩している犬を撫でる', rank: 'bronze' },
-            { id: 49, name: '選ばれし者', condition: '野良猫に懐かれる', rank: 'bronze' },
-            { id: 50, name: '漆黒の王者', condition: 'カラスに挨拶を返す', rank: 'bronze' },
-            { id: 51, name: '痛恨の一撃', condition: '電車に乗り遅れる', rank: 'bronze' },
-            { id: 52, name: '電池切れ？', condition: '道に迷う', rank: 'bronze' },
-            { id: 53, name: '直属のディナー', condition: '上司と2人で食事に行く', rank: 'bronze' },
-            { id: 54, name: '野人', condition: '2日間風呂に入らない', rank: 'bronze' },
-            { id: 94, name: 'ゴールドソーサーの勝者', condition: 'ゲームセンターのクレーンゲームやアーケードゲームで景品をGETする', rank: 'bronze' },
-            { id: 55, name: '水面の旅人', condition: '雨の日に散歩をする', rank: 'bronze' },
-            { id: 56, name: '大金の重み', condition: '10万円以上の現金を引き出す', rank: 'bronze' },
-            { id: 57, name: '博打打ち', condition: '公営ギャンブルで勝利する', rank: 'bronze' },
-            { id: 58, name: '審判の日', condition: '自室の不要なものを段ボール1箱分処分する', rank: 'bronze' },
-            { id: 59, name: '息を殺して', condition: '隠れんぼをする', rank: 'bronze' },
-            { id: 60, name: 'お前ってさ', condition: '深夜、公園で友人と語る', rank: 'bronze' },
-            { id: 61, name: '振り替え輸送', condition: '電車の遅延で影響を受ける', rank: 'bronze' },
-            { id: 62, name: 'Runaway', condition: '鬼ごっこをする', rank: 'bronze' },
-            { id: 63, name: 'ターミナル', condition: '空港で24時間過ごす', rank: 'bronze' },
-            { id: 64, name: 'いい日旅立ち', condition: '駅弁を食べながら特急列車または新幹線に乗る', rank: 'bronze' },
-            { id: 65, name: '外の世界は', condition: '海外へ行く', rank: 'bronze' },
-            { id: 66, name: 'エンジェルナンバー', condition: '時計でゾロ目を目撃する', rank: 'bronze' },
-            { id: 67, name: 'お口に合いますか？', condition: '見知らぬ国の料理を食べる', rank: 'bronze' },
-            { id: 68, name: 'セルフメンテナンス', condition: 'プロのマッサージや整体を受ける', rank: 'bronze' },
-            { id: 69, name: 'サプライズサンタ', condition: 'なんでもない日、身近な人に贈り物をする', rank: 'bronze' },
-            { id: 70, name: '小さな親切', condition: 'お釣りを忘れている人に声をかける', rank: 'bronze' },
-            { id: 71, name: '狙い撃ち', condition: 'カプセルトイにて一回で1番欲しいものを当てる', rank: 'bronze' },
-            { id: 72, name: '形勢逆転', condition: '麻雀で役満を上がる', rank: 'bronze' },
-            { id: 73, name: 'なんのその', condition: '1人でファミリーレストランへ入店して食事する', rank: 'bronze' },
-            { id: 74, name: 'いざラスベガスへ', condition: 'ポーカーでロイヤルフラッシュを完成させる', rank: 'bronze' },
-            { id: 76, name: '寿司屋へ行こう', condition: '釣りを6時間以上試み、一匹も釣り上げない', rank: 'bronze' },
-            { id: 77, name: 'ゲーマー', condition: '1本のゲームタイトルを1000時間以上遊ぶ', rank: 'bronze' },
-            { id: 78, name: '恥知らずの', condition: '旅行に置いて行かれる', rank: 'bronze' },
-            { id: 84, name: '抱えきれないほどの幸せ', condition: '駄菓子を2000円分購入する', rank: 'bronze' },
-            { id: 85, name: 'これで安心', condition: 'ライターや着火剤を使わず、火起こしを成功させる', rank: 'bronze' },
-            { id: 86, name: '知識の証明', condition: 'なんらかの国家資格または検定試験に合格する', rank: 'bronze' },
-            { id: 87, name: '文字通り', condition: 'セブンイレブンにて税込711円ピッタリ買い物をする', rank: 'bronze' },
-            { id: 88, name: 'スプリント！', condition: '全力疾走して自分の50m走のタイムを計測する', rank: 'bronze' },
-            { id: 92, name: '星を救う者', condition: '街のゴミ拾いを行うまたは、エコ活動に参加する', rank: 'bronze' },
-            { id: 89, name: '夜のピクニック', condition: '天体観測に行く', rank: 'bronze' },
-            { id: 90, name: 'ルーティンブレイカー', condition: 'よく行く飲食店で一度も頼んだことのないメニューを注文する', rank: 'bronze' }
+            { id: 1, name: '夢、叶えし者', condition: '夢を叶える', rank: 'platinum', isUltimate: true, genre: 'special' },
+            { id: 2, name: 'バイリンガル', condition: 'TOEICで満点を取る', rank: 'gold', genre: 'challenge' },
+            { id: 3, name: '言語学者', condition: '漢検一級を取得', rank: 'gold', genre: 'challenge' },
+            { id: 4, name: 'Off the wall', condition: 'ベンチプレス100kgをクリア', rank: 'gold', genre: 'challenge' },
+            { id: 5, name: 'なにわの怪人', condition: '大阪環状線を徒歩で一周する', rank: 'gold', genre: 'challenge' },
+            { id: 6, name: '江戸の傾奇者', condition: '山手線を徒歩で一周する', rank: 'gold', genre: 'challenge' },
+            { id: 7, name: '孤独のファンタジー', condition: '1人で遊園地に行く', rank: 'gold', genre: 'play' },
+            { id: 8, name: '国境なき絆', condition: '海外の友人を作る', rank: 'gold', genre: 'travel' },
+            { id: 9, name: '紳士の洗礼', condition: 'クリケットを行う', rank: 'gold', genre: 'play' },
+            { id: 10, name: '空の王者', condition: 'パラグライダーまたはスカイダイビングを体験する。', rank: 'gold', genre: 'travel' },
+            { id: 11, name: '大海の覇者', condition: 'マリンスポーツで遊ぶ', rank: 'gold', genre: 'travel' },
+            { id: 12, name: '完全制覇', condition: 'お気に入り飲食店のメニューを全て食べた。', rank: 'gold', genre: 'daily' },
+            { id: 13, name: 'デビュー待ち', condition: 'カラオケで100点を叩き出す', rank: 'gold', genre: 'play' },
+            { id: 14, name: '伝説の目撃者', condition: '現地でプロのモータースポーツやプロスポーツの決勝を観戦する', rank: 'gold', genre: 'play' },
+            { id: 15, name: 'Bullet', condition: '日帰りまたは0泊で海外へ行く', rank: 'gold', genre: 'travel' },
+            { id: 16, name: '本物の勝負師', condition: '合法的なカジノで遊ぶ', rank: 'gold', genre: 'play' },
+            { id: 17, name: 'ダイヤモンドは砕けない', condition: 'ダイヤモンド製品を購入する', rank: 'gold', genre: 'special' },   
+            { id: 18, name: 'アルテマ', condition: '大掃除や断捨離で自分に不要なものを完全処分する', rank: 'gold', genre: 'daily' },
+            { id: 19, name: 'スティールボールラン', condition: '馬に乗る', rank: 'silver', genre: 'play' },
+            { id: 20, name: 'なにわの商人', condition: '家電量販店で値引きを交渉をして割引をしてもらう', rank: 'silver', genre: 'daily' },
+            { id: 21, name: 'デジタルデトックス', condition: '見知らぬ人に教えを請う', rank: 'silver', genre: 'daily' },
+            { id: 22, name: 'ポーカーフェイスドロップ', condition: 'ジェットコースターで叫ばない', rank: 'silver', genre: 'play' },
+            { id: 23, name: '明けの明星', condition: '始発で出かける', rank: 'silver', genre: 'travel' },
+            { id: 24, name: 'グローバル化社会', condition: 'TOEICを受ける', rank: 'silver', genre: 'challenge' },
+            { id: 25, name: '寒風の半袖ファイター', condition: '気温が10℃を下回ってる日に半袖で出かける', rank: 'silver', genre: 'special' },
+            { id: 26, name: 'ストライカー', condition: 'シュートを決める', rank: 'silver', genre: 'play' },
+            { id: 27, name: '銀世界', condition: 'ウインタースポーツで遊ぶ', rank: 'silver', genre: 'travel' },
+            { id: 28, name: '栄養学', condition: '厚生労働省が定める日本人の食事摂取基準を満たした食事を1日摂る', rank: 'silver', genre: 'daily' },
+            { id: 29, name: 'ALL OUT', condition: '筋力トレーニングでプロテインシェイカーが振れないほど追い込む', rank: 'silver', genre: 'challenge' },
+            { id: 30, name: '成功者', condition: '平日の昼間にジムに行く', rank: 'silver', genre: 'challenge' },
+            { id: 31, name: 'ナイトクルーズ', condition: '夜行バスで500km以上移動する', rank: 'silver', genre: 'travel' },
+            { id: 32, name: '大悪党', condition: 'その場にいる全員を騙し、後でネタバラシをする', rank: 'silver', genre: 'special' },
+            { id: 33, name: '創作料理人', condition: 'レシピを見ずに美味しい料理を作る', rank: 'silver', genre: 'daily' },
+            { id: 91, name: '気分は監督', condition: '映画館で自分以外の観客がいない状態で映画を見る', rank: 'silver', genre: 'special' },
+            { id: 34, name: '東海道中膝栗毛', condition: '東京大阪間を自動車で移動する', rank: 'silver', genre: 'travel' },
+            { id: 35, name: '不屈の意志', condition: '継続していた悪癖を止める', rank: 'silver', genre: 'challenge' },
+            { id: 36, name: '現金主義', condition: '新品の携帯電話を一括で購入', rank: 'silver', genre: 'daily' },
+            { id: 37, name: '伝説の始まり', condition: 'ホームランを打つ', rank: 'silver', genre: 'challenge' },
+            { id: 38, name: '手中', condition: '高層階に宿泊', rank: 'silver', genre: 'travel' },
+            { id: 39, name: 'この日のために', condition: '大勢の前でダンスを披露する', rank: 'silver', genre: 'challenge' },
+            { id: 40, name: '拡散よろしく！', condition: 'イベントでコスプレをする', rank: 'silver', genre: 'play' },
+            { id: 41, name: 'のんびりスローライフ', condition: '無人島に上陸する', rank: 'silver', genre: 'travel' },
+            { id: 79, name: '重力への叛逆', condition: '懸垂を20回連続で行う', rank: 'silver', genre: 'challenge' },
+            { id: 80, name: 'マイナスイオンが段違い', condition: '日本三大名瀑のうちいずれかを訪れる', rank: 'silver', genre: 'travel' },
+            { id: 81, name: '時空を超えた読書家', condition: '国立国会図書館に足を運び、資料を閲覧する', rank: 'silver', genre: 'travel' },
+            { id: 82, name: 'まだ見ぬ秘湯を求めて', condition: '日本三大古湯または日本三大名泉のいずれかに入浴する', rank: 'silver', genre: 'travel' },
+            { id: 83, name: 'ここで一句', condition: '日本三景のうちいずれかを見る', rank: 'silver', genre: 'travel' },
+            { id: 42, name: 'あの夏の思い出', condition: 'カブト虫を捕まえる', rank: 'bronze', genre: 'play' },
+            { id: 43, name: '秘密のストライク', condition: 'ボウリングでストライクを取る', rank: 'bronze', genre: 'play' },
+            { id: 44, name: 'ブルズアイ', condition: 'ダーツでブルに入れる', rank: 'bronze', genre: 'play' },
+            { id: 45, name: '井の中の蛙', condition: '海に行く', rank: 'bronze', genre: 'travel' },
+            { id: 46, name: '熱狂の観客席', condition: 'スポーツ観戦をする', rank: 'bronze', genre: 'play' },
+            { id: 47, name: '孤高の肉食獣', condition: '1人で焼肉に行く', rank: 'bronze', genre: 'daily' },
+            { id: 48, name: 'モフモフフレンドリー', condition: '散歩している犬を撫でる', rank: 'bronze', genre: 'daily' },
+            { id: 49, name: '選ばれし者', condition: '野良猫に懐かれる', rank: 'bronze', genre: 'daily' },
+            { id: 50, name: '漆黒の王者', condition: 'カラスに挨拶を返す', rank: 'bronze', genre: 'special' },
+            { id: 51, name: '痛恨の一撃', condition: '電車に乗り遅れる', rank: 'bronze', genre: 'daily' },
+            { id: 52, name: '電池切れ？', condition: '道に迷う', rank: 'bronze', genre: 'travel' },
+            { id: 53, name: '直属のディナー', condition: '上司と2人で食事に行く', rank: 'bronze', genre: 'daily' },
+            { id: 54, name: '野人', condition: '2日間風呂に入らない', rank: 'bronze', genre: 'special' },
+            { id: 94, name: 'ゴールドソーサーの勝者', condition: 'ゲームセンターのクレーンゲームやアーケードゲームで景品をGETする', rank: 'bronze', genre: 'play' },
+            { id: 55, name: '水面の旅人', condition: '雨の日に散歩をする', rank: 'bronze', genre: 'daily' },
+            { id: 56, name: '大金の重み', condition: '10万円以上の現金を引き出す', rank: 'bronze', genre: 'daily' },
+            { id: 57, name: '博打打ち', condition: '公営ギャンブルで勝利する', rank: 'bronze', genre: 'play' },
+            { id: 58, name: '審判の日', condition: '自室の不要なものを段ボール1箱分処分する', rank: 'bronze', genre: 'daily' },
+            { id: 59, name: '息を殺して', condition: '隠れんぼをする', rank: 'bronze', genre: 'play' },
+            { id: 60, name: 'お前ってさ', condition: '深夜、公園で友人と語る', rank: 'bronze', genre: 'daily' },
+            { id: 61, name: '振り替え輸送', condition: '電車の遅延で影響を受ける', rank: 'bronze', genre: 'daily' },
+            { id: 62, name: 'Runaway', condition: '鬼ごっこをする', rank: 'bronze', genre: 'play' },
+            { id: 63, name: 'ターミナル', condition: '空港で24時間過ごす', rank: 'bronze', genre: 'travel' },
+            { id: 64, name: 'いい日旅立ち', condition: '駅弁を食べながら特急列車または新幹線に乗る', rank: 'bronze', genre: 'travel' },
+            { id: 65, name: '外の世界は', condition: '海外へ行く', rank: 'bronze', genre: 'travel' },
+            { id: 66, name: 'エンジェルナンバー', condition: '時計でゾロ目を目撃する', rank: 'bronze', genre: 'special' },
+            { id: 67, name: 'お口に合いますか？', condition: '見知らぬ国の料理を食べる', rank: 'bronze', genre: 'daily' },
+            { id: 68, name: 'セルフメンテナンス', condition: 'プロのマッサージや整体を受ける', rank: 'bronze', genre: 'daily' },
+            { id: 69, name: 'サプライズサンタ', condition: 'なんでもない日、身近な人に贈り物をする', rank: 'bronze', genre: 'daily' },
+            { id: 70, name: '小さな親切', condition: 'お釣りを忘れている人に声をかける', rank: 'bronze', genre: 'daily' },
+            { id: 71, name: '狙い撃ち', condition: 'カプセルトイにて一回で1番欲しいものを当てる', rank: 'bronze', genre: 'special' },
+            { id: 72, name: '形勢逆転', condition: '麻雀で役満を上がる', rank: 'bronze', genre: 'play' },
+            { id: 73, name: 'なんのその', condition: '1人でファミリーレストランへ入店して食事する', rank: 'bronze', genre: 'daily' },
+            { id: 74, name: 'いざラスベガスへ', condition: 'ポーカーでロイヤルフラッシュを完成させる', rank: 'bronze', genre: 'special' },
+            { id: 76, name: '寿司屋へ行こう', condition: '釣りを6時間以上試み、一匹も釣り上げない', rank: 'bronze', genre: 'special' },
+            { id: 77, name: 'ゲーマー', condition: '1本のゲームタイトルを1000時間以上遊ぶ', rank: 'bronze', genre: 'play' },
+            { id: 78, name: '恥知らずの', condition: '旅行に置いて行かれる', rank: 'bronze', genre: 'special' },
+            { id: 84, name: '抱えきれないほどの幸せ', condition: '駄菓子を2000円分購入する', rank: 'bronze', genre: 'daily' },
+            { id: 85, name: 'これで安心', condition: 'ライターや着火剤を使わず、火起こしを成功させる', rank: 'bronze', genre: 'challenge' },
+            { id: 86, name: '知識の証明', condition: 'なんらかの国家資格または検定試験に合格する', rank: 'bronze', genre: 'challenge' },
+            { id: 87, name: '文字通り', condition: 'セブンイレブンにて税込711円ピッタリ買い物をする', rank: 'bronze', genre: 'special' },
+            { id: 88, name: 'スプリント！', condition: '全力疾走して自分の50m走のタイムを計測する', rank: 'bronze', genre: 'challenge' },
+            { id: 92, name: '星を救う者', condition: '街のゴミ拾いを行うまたは、エコ活動に参加する', rank: 'bronze', genre: 'daily' },
+            { id: 89, name: '夜のピクニック', condition: '天体観測に行く', rank: 'bronze', genre: 'travel' },
+            { id: 90, name: 'ルーティンブレイカー', condition: 'よく行く飲食店で一度も頼んだことのないメニューを注文する', rank: 'bronze', genre: 'daily' }
         ];
+
 
         const limitedTrophies202611 = [
             { id: 'ym_2026_11_01', name: '黄金の絨毯2026', condition: 'イチョウ並木を歩き、黄色く染まった風景を撮影する', rank: 'gold', year: 2026, month: 11, isLimited: true },
