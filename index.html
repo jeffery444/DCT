@@ -2792,8 +2792,8 @@
                                 uid: doc.id,
                                 username: data.username || 'user',
                                 displayName: data.displayName || data.username || 'ユーザー',
-                                bio: data.bio || '人生の実績解除中！',
-                                avatar: data.avatar || '',
+                                bio: data.bio || 'ステータスメッセージがありません',
+                                avatar: p.userAvatar || p.avatar || (userMap[p.uid] && userMap[p.uid].avatar) || '',
                                 following: data.following || [],
                                 followers: data.followers || [],
                                 privacy: data.privacy || 'public',
@@ -2817,8 +2817,8 @@
                                     uid: p.uid,
                                     username: p.username || (userMap[p.uid] && userMap[p.uid].username) || 'user',
                                     displayName: p.displayName || p.username || 'ユーザー',
-                                    bio: p.bio || (userMap[p.uid] && userMap[p.uid].bio) || '人生の実績解除中！',
-                                    avatar: p.userAvatar || (userMap[p.uid] && userMap[p.uid].avatar) || '',
+                                    bio: p.bio || (userMap[p.uid] && userMap[p.uid].bio) || 'ステータスメッセージがありません',
+                                    avatar: p.userAvatar || p.avatar || (userMap[p.uid] && userMap[p.uid].avatar) || '',
                                     following: (userMap[p.uid] && userMap[p.uid].following) || [],
                                     followers: (userMap[p.uid] && userMap[p.uid].followers) || [],
                                     privacy: 'public'
@@ -3151,12 +3151,17 @@
             let freshTargetData = Object.assign({}, profileData);
             let targetCustomTrophies = [];
 
+            // 1. usersコレクションから最新データを取得
             try {
                 const doc = await withTimeout(db.collection('users').doc(uid).get(), 2000);
                 if (doc && doc.exists) {
-                    freshTargetData = Object.assign(freshTargetData, doc.data());
-                    if (Array.isArray(doc.data().customTrophies)) {
-                        targetCustomTrophies = doc.data().customTrophies;
+                    const d = doc.data();
+                    freshTargetData = Object.assign(freshTargetData, d);
+                    if (d.avatar || d.userAvatar) {
+                        freshTargetData.avatar = d.avatar || d.userAvatar;
+                    }
+                    if (Array.isArray(d.customTrophies)) {
+                        targetCustomTrophies = d.customTrophies;
                     }
                 }
                 const statusDoc = await withTimeout(db.collection('users').doc(uid).collection('trophies').doc('status').get(), 2000);
@@ -3171,14 +3176,36 @@
                 if (unlockedSnap) unlockedSnap.forEach(d => { targetState[d.id] = d.data(); });
             } catch (e) {}
 
+            // 2. profile_インデックスからフォールバック取得（実績未解除ユーザーのアイコンも確実に取得）
+            if (!freshTargetData.avatar) {
+                try {
+                    const idxDoc = await withTimeout(db.collection('posts').doc('profile_' + uid).get(), 1500);
+                    if (idxDoc && idxDoc.exists) {
+                        const idata = idxDoc.data();
+                        if (idata.userAvatar || idata.avatar) {
+                            freshTargetData.avatar = idata.userAvatar || idata.avatar;
+                        }
+                        if (!freshTargetData.displayName && idata.displayName) freshTargetData.displayName = idata.displayName;
+                        if (!freshTargetData.username && idata.username) freshTargetData.username = idata.username;
+                        if (!freshTargetData.bio && idata.bio) freshTargetData.bio = idata.bio;
+                    }
+                } catch (e) {}
+            }
+
+            // 3. 投稿データから実績とアイコンを補完
             try {
                 const userPosts = await withTimeout(db.collection('posts').where('uid', '==', uid).get(), 2000);
                 if (userPosts) {
                     userPosts.forEach(doc => {
                         const p = doc.data();
                         if (p.isCircleDoc) return;
+                        if (!freshTargetData.avatar && (p.userAvatar || p.avatar)) {
+                            freshTargetData.avatar = p.userAvatar || p.avatar;
+                        }
                         if (p.isProfileIndex) {
-                            if (Array.isArray(p.customTrophies)) targetCustomTrophies = p.customTrophies;
+                            if (Array.isArray(p.customTrophies) && targetCustomTrophies.length === 0) {
+                                targetCustomTrophies = p.customTrophies;
+                            }
                         } else if (p.trophyId) {
                             if (!targetState[p.trophyId]) {
                                 targetState[p.trophyId] = {
@@ -3225,13 +3252,14 @@
             const headerBox = document.createElement('div');
             headerBox.className = 'profile-card-header';
             
-            const avatarHTML = freshTargetData.avatar 
-                ? `<img src="${freshTargetData.avatar}" class="profile-avatar-large clickable" id="target-profile-avatar-el" title="タップして拡大">` 
+            const avatarSrc = (freshTargetData.avatar && String(freshTargetData.avatar).trim() !== '') ? freshTargetData.avatar : '';
+            const avatarHTML = avatarSrc 
+                ? `<img src="${avatarSrc}" class="profile-avatar-large clickable" id="target-profile-avatar-el" title="タップして拡大">` 
                 : `<div class="profile-avatar-large clickable" id="target-profile-avatar-el" title="タップして拡大"><i class="fa-solid fa-user"></i></div>`;
 
             const isFollowing = (myProfile.following || []).includes(uid);
-            const followersCount = (freshTargetData.followers || []).length;
-            const followingCount = (freshTargetData.following || []).length;
+            const followingList = Array.isArray(freshTargetData.following) ? freshTargetData.following : [];
+            const followersList = Array.isArray(freshTargetData.followers) ? freshTargetData.followers : [];
 
             headerBox.innerHTML = `
                 ${avatarHTML}
@@ -3240,17 +3268,28 @@
                     <div class="profile-username">@${freshTargetData.username || 'user'}</div>
                     <div class="profile-bio">${freshTargetData.bio || 'ステータス未設定'}</div>
                     <div class="follow-stats-row">
-                        <div>フォロー <span>${followingCount}</span></div>
-                        <div>フォロワー <span id="target-followers-count">${followersCount}</span></div>
+                        <div id="target-following-btn">フォロー <span>${followingList.length}</span></div>
+                        <div id="target-followers-btn">フォロワー <span id="target-followers-count">${followersList.length}</span></div>
                     </div>
                     <button class="btn-action-small ${isFollowing ? 'following' : ''}" id="follow-toggle-btn" onclick="toggleFollow('${uid}')">${isFollowing ? 'フォロー中' : 'フォローする'}</button>
                 </div>
             `;
             container.appendChild(headerBox);
 
+            // アイコンタップで拡大表示（innerHTML += を使わないためイベントが消えません）
             const targetAvatarEl = document.getElementById('target-profile-avatar-el');
             if (targetAvatarEl) {
-                targetAvatarEl.onclick = () => openAvatarLightbox(freshTargetData.avatar, freshTargetData.displayName || freshTargetData.username || 'ユーザー');
+                targetAvatarEl.onclick = () => openAvatarLightbox(avatarSrc, freshTargetData.displayName || freshTargetData.username || 'ユーザー');
+            }
+
+            // 他ユーザーのフォロー・フォロワーリストを開くイベント
+            const followingBtn = document.getElementById('target-following-btn');
+            if (followingBtn) {
+                followingBtn.onclick = () => openFollowListModal('following', uid, freshTargetData.displayName || freshTargetData.username);
+            }
+            const followersBtn = document.getElementById('target-followers-btn');
+            if (followersBtn) {
+                followersBtn.onclick = () => openFollowListModal('followers', uid, freshTargetData.displayName || freshTargetData.username);
             }
 
             const albumTitle = document.createElement('div');
@@ -3285,7 +3324,10 @@
             if (photoCount > 0) {
                 container.appendChild(grid);
             } else {
-                container.innerHTML += '<div style="text-align:center; color:var(--text-secondary); font-size:0.75rem; padding:16px; background:var(--surface-card); border-radius:10px; margin-bottom:16px;">公開されている実績メディアはまだありません</div>';
+                const emptyGallery = document.createElement('div');
+                emptyGallery.style.cssText = 'text-align:center; color:var(--text-secondary); font-size:0.75rem; padding:16px; background:var(--surface-card); border-radius:10px; margin-bottom:16px;';
+                emptyGallery.innerText = '公開されている実績メディアはまだありません';
+                container.appendChild(emptyGallery);
             }
 
             const trophyListEl = document.createElement('div');
@@ -3293,7 +3335,7 @@
             let totalUnlocked = 0;
 
             allTargetTrophies.forEach(t => {
-                const isUnlocked = !!targetState[t.id];
+                const isUnlocked = isTrophyUnlocked(targetState, t.id);
                 if (t.isLimited && !isUnlocked && !isCurrentMonthActive(t.year, t.month)) return;
 
                 const rankClass = `rank-${t.rank || 'bronze'}`;
@@ -3305,7 +3347,7 @@
                 const card = document.createElement('div');
                 card.className = `trophy-card ${isUnlocked ? 'unlocked' : ''} ${t.isUltimate ? 'ultimate' : ''}`;
                 
-                const iconContent = isUnlocked ? getIconMediaHTML(targetState[t.id].photo) : `<i class="fa-solid fa-trophy"></i>`;
+                const iconContent = (targetState[t.id] && targetState[t.id].photo) ? getIconMediaHTML(targetState[t.id].photo) : `<i class="fa-solid fa-trophy"></i>`;
 
                 let displayNameStr = t.name;
                 if (t.isLimited) displayNameStr = `⏳ ${t.name}`;
@@ -3523,16 +3565,30 @@
             }
         }
 
-        async function openFollowListModal(type) {
+        async function openFollowListModal(type, targetUid = null, targetName = '') {
             const titleEl = document.getElementById('follow-list-title');
             const listContainer = document.getElementById('follow-list-container');
             if (!titleEl || !listContainer) return;
 
-            titleEl.innerText = type === 'following' ? 'フォロー中リスト' : 'フォロワーリスト';
+            const isMe = !targetUid || (currentUser && targetUid === currentUser.uid);
+            const prefix = isMe ? '' : `${targetName || 'ユーザー'}の`;
+            titleEl.innerText = type === 'following' ? `${prefix}フォロー中リスト` : `${prefix}フォロワーリスト`;
             listContainer.innerHTML = '<div style="text-align:center; color:var(--text-secondary); font-size:0.8rem; padding:20px;">読み込み中...</div>';
             openModal('follow-list-modal');
 
-            const targetIds = type === 'following' ? myProfile.following : myProfile.followers;
+            let targetIds = [];
+            if (isMe) {
+                targetIds = type === 'following' ? myProfile.following : myProfile.followers;
+            } else {
+                try {
+                    const uDoc = await withTimeout(db.collection('users').doc(targetUid).get(), 2000);
+                    if (uDoc && uDoc.exists) {
+                        const d = uDoc.data();
+                        targetIds = type === 'following' ? (d.following || []) : (d.followers || []);
+                    }
+                } catch (e) {}
+            }
+
             if (!targetIds || targetIds.length === 0) {
                 listContainer.innerHTML = '<div style="text-align:center; color:var(--text-secondary); font-size:0.8rem; padding:20px;">ユーザーはいません</div>';
                 return;
@@ -3569,6 +3625,7 @@
                 listContainer.innerHTML = '<div style="text-align:center; color:var(--text-secondary); font-size:0.8rem; padding:20px;">読み込みに失敗しました</div>';
             }
         }
+
 
         async function toggleFollow(targetUid) {
             if (!currentUser) return;
