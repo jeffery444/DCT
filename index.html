@@ -632,6 +632,7 @@
         let isAuthProcessing = false;
         let selectedTrophyId = null;
         let unlockModalMode = 'unlock'; // 'unlock' または 'progress'
+        let feedMode = 'following';
         let activeTab = 'trophies';
         let boardCategory = 'default';
         let trophyFilter = 'all';
@@ -2512,30 +2513,140 @@
         /* -------------------------------------------------------------
            ホーム（タイムライン）View：常に最新のアイコン・表示名を表示
         ------------------------------------------------------------- */
-                async function renderFeedView() {
+                function shuffleArray(array) {
+            const arr = [...array];
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
+        function importCustomTrophy(encodedName, encodedCondition, rank, creatorName) {
+            if (!currentUser) return;
+            const name = decodeURIComponent(encodedName);
+            const condition = decodeURIComponent(encodedCondition);
+            const validRank = ['platinum', 'gold', 'silver', 'bronze'].includes(rank) ? rank : 'gold';
+
+            if (customTrophies.some(t => t.name === name)) {
+                alert(`「${name}」はすでにあなたのカスタム実績に追加されています！`);
+                return;
+            }
+
+            customTrophies.push({
+                id: 'custom_' + Date.now(),
+                name: name,
+                condition: condition,
+                rank: validRank,
+                isCustom: true,
+                inspiredBy: creatorName || ''
+            });
+
+            saveCustomTrophiesToStorage();
+            showNotification(`「${name}」を自分のボードに追加しました！`, 'CUSTOM IMPORTED');
+            renderFeedView();
+        }
+
+        async function renderFeedView() {
             const container = document.getElementById('main-container');
             if (!container) return;
             container.innerHTML = '<div style="text-align:center; color:var(--text-secondary); font-size:0.8rem; padding:20px;">タイムライン読み込み中...</div>';
 
             try {
-                const snapshot = await withTimeout(db.collection('posts').orderBy('createdAt', 'desc').limit(80).get(), 3000);
-                container.innerHTML = '<div style="font-size:0.9rem; font-weight:800; margin-bottom:14px; text-align:center;">📡 タイムライン (フォロー中)</div>';
+                const snapshot = await withTimeout(db.collection('posts').orderBy('createdAt', 'desc').limit(120).get(), 3000);
+                container.innerHTML = '';
+
+                // 上部のモード切り替えタブ（フォロー中 / ランダム発見）
+                const modeTabs = document.createElement('div');
+                modeTabs.className = 'mode-switch-group';
+                modeTabs.style.marginBottom = '14px';
+                modeTabs.innerHTML = `
+                    <button class="mode-switch-btn ${feedMode === 'following' ? 'active-unlock' : ''}" onclick="feedMode='following'; renderFeedView();">
+                        👥 フォロー中
+                    </button>
+                    <button class="mode-switch-btn ${feedMode === 'random' ? 'active-unlock' : ''}" onclick="feedMode='random'; renderFeedView();">
+                        🎲 みんなの実績 (カスタム)
+                    </button>
+                `;
+                container.appendChild(modeTabs);
+
+                if (feedMode === 'random') {
+                    const subHeader = document.createElement('div');
+                    subHeader.style.cssText = 'display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;';
+                    subHeader.innerHTML = `
+                        <div style="font-size:0.75rem; color:var(--text-secondary); font-weight:700;">✨ みんなが作ったカスタム実績・投稿</div>
+                        <button class="btn-action-small" onclick="renderFeedView()"><i class="fa-solid fa-shuffle"></i> シャッフル</button>
+                    `;
+                    container.appendChild(subHeader);
+                }
 
                 const followingList = Array.isArray(myProfile.following) ? myProfile.following : [];
                 const allowedUids = currentUser ? [...followingList, currentUser.uid] : followingList;
 
                 const allTrophiesList = getAllTrophies();
-                const filteredDocs = [];
+                let targetItems = [];
                 const uniqueUids = new Set();
 
-                if (snapshot && !snapshot.empty) {
-                    snapshot.forEach(doc => {
-                        const post = doc.data();
-                        if (post.isProfileIndex || post.isCircleDoc) return;
-                        if (!allowedUids.includes(post.uid)) return;
-                        filteredDocs.push({ id: doc.id, data: post });
-                        if (post.uid) uniqueUids.add(post.uid);
-                    });
+                if (feedMode === 'following') {
+                    // フォロー中モード：自分とフォロー中の人の投稿を時系列表示
+                    if (snapshot && !snapshot.empty) {
+                        snapshot.forEach(doc => {
+                            const post = doc.data();
+                            if (post.isProfileIndex || post.isCircleDoc) return;
+                            if (!allowedUids.includes(post.uid)) return;
+                            targetItems.push({ kind: 'post', id: doc.id, data: post });
+                            if (post.uid) uniqueUids.add(post.uid);
+                        });
+                    }
+                } else {
+                    // ランダム発見モード：全ユーザーのカスタム実績投稿 ＋ 未解除の公開カスタム実績を収集してシャッフル
+                    const seenTrophyKeys = new Set();
+
+                    if (snapshot && !snapshot.empty) {
+                        snapshot.forEach(doc => {
+                            const post = doc.data();
+                            if (post.isCircleDoc) return;
+
+                            // プロフィールインデックスから、まだ投稿されていないカスタム実績も拾う
+                            if (post.isProfileIndex) {
+                                if (Array.isArray(post.customTrophies) && post.uid) {
+                                    uniqueUids.add(post.uid);
+                                    post.customTrophies.forEach(ct => {
+                                        if (ct && ct.name && ct.condition) {
+                                            const key = `${post.uid}_${ct.name}`;
+                                            if (!seenTrophyKeys.has(key)) {
+                                                seenTrophyKeys.add(key);
+                                                targetItems.push({
+                                                    kind: 'custom_card',
+                                                    uid: post.uid,
+                                                    displayName: post.displayName || post.username || 'ユーザー',
+                                                    username: post.username || 'user',
+                                                    userAvatar: post.userAvatar || '',
+                                                    trophyName: ct.name,
+                                                    condition: ct.condition,
+                                                    trophyRank: ct.rank || 'gold'
+                                                });
+                                            }
+                                        }
+                                    });
+                                }
+                                return;
+                            }
+
+                            // カスタム実績の解除・進捗投稿を拾う（デフォルト実績に含まれないものもカスタム扱い）
+                            const isCustomPost = String(post.trophyId || '').startsWith('custom_') ||
+                                !defaultTrophies.some(dt => String(dt.id) === String(post.trophyId) || dt.name === post.trophyName);
+
+                            if (isCustomPost && post.trophyName) {
+                                const key = `${post.uid}_${post.trophyName}`;
+                                seenTrophyKeys.add(key);
+                                targetItems.push({ kind: 'post', id: doc.id, data: post, isCustom: true });
+                                if (post.uid) uniqueUids.add(post.uid);
+                            }
+                        });
+                    }
+                    // ランダムにシャッフルして最大30件表示
+                    targetItems = shuffleArray(targetItems).slice(0, 30);
                 }
 
                 const latestUserMap = {};
@@ -2545,11 +2656,66 @@
 
                 let realPostCount = 0;
 
-                filteredDocs.forEach(item => {
-                    const post = item.data;
-                    const postId = item.id;
+                targetItems.forEach(item => {
                     realPostCount++;
 
+                    // パターンA：まだ投稿されていないカスタム実績カード（プロフィールから抽出）
+                    if (item.kind === 'custom_card') {
+                        const latestUser = latestUserMap[item.uid] || {};
+                        const currentAvatar = (latestUser.avatar && latestUser.avatar.trim() !== '') ? latestUser.avatar : item.userAvatar;
+                        const currentDisplayName = latestUser.displayName || item.displayName || 'ユーザー';
+                        const currentUsername = latestUser.username || item.username || 'user';
+                        const rank = item.trophyRank || 'gold';
+
+                        let rankColorVar = 'var(--rank-gold)';
+                        if (rank === 'platinum') rankColorVar = 'var(--rank-platinum)';
+                        else if (rank === 'silver') rankColorVar = 'var(--rank-silver)';
+                        else if (rank === 'bronze') rankColorVar = 'var(--rank-bronze)';
+
+                        const alreadyHave = customTrophies.some(t => t.name === item.trophyName);
+                        const isMine = currentUser && item.uid === currentUser.uid;
+                        const encName = encodeURIComponent(item.trophyName || '');
+                        const encCond = encodeURIComponent(item.condition || '');
+
+                        const avatarHTML = currentAvatar 
+                            ? `<img src="${currentAvatar}" class="feed-avatar">` 
+                            : `<div class="feed-avatar"><i class="fa-solid fa-user"></i></div>`;
+
+                        const card = document.createElement('div');
+                        card.className = 'feed-card';
+                        card.innerHTML = `
+                            <div class="feed-header">
+                                <div class="feed-user-info" onclick="openUserFromFeed('${item.uid}')">
+                                    ${avatarHTML}
+                                    <div>
+                                        <div class="feed-display-name">${currentDisplayName}</div>
+                                        <div class="feed-user-name">@${currentUsername} のカスタム実績</div>
+                                    </div>
+                                </div>
+                                <span class="rank-tag rank-${rank}">${rank}</span>
+                            </div>
+                            <div class="feed-trophy-banner" style="margin-bottom:10px;">
+                                <div style="font-size:0.65rem; color:${rankColorVar}; font-weight:800; letter-spacing:1px; margin-bottom:2px;">
+                                    ✨ CUSTOM TROPHY IDEA
+                                </div>
+                                <div style="font-size:0.95rem; font-weight:800; color:var(--text-primary); margin-bottom:4px;">
+                                    <i class="fa-solid fa-trophy" style="color:${rankColorVar}; margin-right:4px;"></i>${item.trophyName}
+                                </div>
+                                <div style="font-size:0.78rem; color:var(--text-secondary);">🎯 条件: ${item.condition || '条件なし'}</div>
+                            </div>
+                            ${!isMine ? `
+                                <button class="${alreadyHave ? 'btn-action-small following' : 'btn-primary-small'}" style="width:100%; padding:10px;" ${alreadyHave ? 'disabled' : ''} onclick="importCustomTrophy('${encName}', '${encCond}', '${rank}', '${currentDisplayName}')">
+                                    ${alreadyHave ? '✅ 自分のボードに追加済み' : '📥 この実績を自分のボードに追加する'}
+                                </button>
+                            ` : `<div style="font-size:0.7rem; color:var(--text-secondary); text-align:center;">※あなたが作成したカスタム実績です</div>`}
+                        `;
+                        container.appendChild(card);
+                        return;
+                    }
+
+                    // パターンB：通常の解除・進捗投稿カード
+                    const post = item.data;
+                    const postId = item.id;
                     const isLiked = currentUser && (post.likes || []).includes(currentUser.uid);
                     const isProgressPost = (post.postType === 'progress');
 
@@ -2564,6 +2730,22 @@
                     if (rank === 'platinum') rankColorVar = 'var(--rank-platinum)';
                     else if (rank === 'silver') rankColorVar = 'var(--rank-silver)';
                     else if (rank === 'bronze') rankColorVar = 'var(--rank-bronze)';
+
+                    const isCustomPost = item.isCustom || String(post.trophyId || '').startsWith('custom_') ||
+                        !defaultTrophies.some(dt => String(dt.id) === String(post.trophyId) || dt.name === post.trophyName);
+                    const alreadyHave = customTrophies.some(t => t.name === post.trophyName);
+                    const isMine = currentUser && post.uid === currentUser.uid;
+                    const conditionStr = post.condition || (matchedTrophy ? matchedTrophy.condition : 'カスタム実績');
+                    const encName = encodeURIComponent(post.trophyName || 'カスタム実績');
+                    const encCond = encodeURIComponent(conditionStr);
+
+                    const importBtnHTML = (isCustomPost && !isMine) ? `
+                        <div style="margin-bottom: 12px;">
+                            <button class="${alreadyHave ? 'btn-action-small following' : 'btn-primary-small'}" style="width:100%; padding:9px;" ${alreadyHave ? 'disabled' : ''} onclick="importCustomTrophy('${encName}', '${encCond}', '${rank}', '${currentDisplayName}')">
+                                ${alreadyHave ? '✅ 自分のボードに追加済み' : '📥 このカスタム実績を自分のボードに追加する'}
+                            </button>
+                        </div>
+                    ` : '';
 
                     const avatarHTML = currentAvatar 
                         ? `<img src="${currentAvatar}" class="feed-avatar">` 
@@ -2585,19 +2767,21 @@
                     const bannerHTML = isProgressPost
                         ? `<div class="feed-trophy-banner" style="border-color: rgba(48, 209, 88, 0.4);">
                                 <div style="font-size:0.65rem; color:var(--accent-green); font-weight:800; letter-spacing:1px; margin-bottom:2px;">
-                                    🗺️ TROPHY PROGRESS
+                                    🗺️ TROPHY PROGRESS ${isCustomPost ? '・ ✨ CUSTOM' : ''}
                                 </div>
                                 <div style="font-size:0.95rem; font-weight:800; color:var(--text-primary);">
                                     <i class="fa-solid fa-person-running" style="color:var(--accent-green); margin-right:6px;"></i>「${post.trophyName || '実績'}」 進捗
                                 </div>
+                                ${conditionStr ? `<div style="font-size:0.72rem; color:var(--text-secondary); margin-top:4px;">🎯 条件: ${conditionStr}</div>` : ''}
                            </div>`
                         : `<div class="feed-trophy-banner">
                                 <div style="font-size:0.65rem; color:${rankColorVar}; font-weight:800; letter-spacing:1px; margin-bottom:2px;">
-                                    ${rank.toUpperCase()} TROPHY UNLOCKED
+                                    ${rank.toUpperCase()} TROPHY UNLOCKED ${isCustomPost ? '・ ✨ CUSTOM' : ''}
                                 </div>
                                 <div style="font-size:0.95rem; font-weight:800; color:var(--text-primary);">
                                     <i class="fa-solid fa-trophy" style="color:${rankColorVar}; margin-right:4px;"></i>${post.trophyName || '実績'}
                                 </div>
+                                ${conditionStr ? `<div style="font-size:0.72rem; color:var(--text-secondary); margin-top:4px;">🎯 条件: ${conditionStr}</div>` : ''}
                            </div>`;
 
                     const card = document.createElement('div');
@@ -2618,6 +2802,7 @@
                         ${bannerHTML}
                         ${mediaHTML}
                         ${commentHTML}
+                        ${importBtnHTML}
 
                         <div class="feed-actions">
                             <div class="feed-actions-left">
@@ -2655,7 +2840,7 @@
 
                     const imgBtn = document.getElementById(`feed-img-${postId}`);
                     if (imgBtn && !isVideoSource(post.photo)) {
-                        imgBtn.onclick = () => openPhotoLightbox(post.photo, post.trophyName || '実績', post.condition || '', post.date || '', post.comment || '', postId, post.uid, post.trophyId);
+                        imgBtn.onclick = () => openPhotoLightbox(post.photo, post.trophyName || '実績', conditionStr, post.date || '', post.comment || '', postId, post.uid, post.trophyId);
                     }
 
                     const shareBtn = document.getElementById(`feed-share-${postId}`);
@@ -2665,9 +2850,12 @@
                 });
 
                 if (realPostCount === 0) {
+                    const emptyText = feedMode === 'following'
+                        ? 'フォローしているユーザーの投稿がまだありません。<br>上の「🎲 ランダム発見」タブに切り替えると、みんなが作ったカスタム実績を見ることができます！'
+                        : 'まだ公開されているカスタム実績がありません。<br>最初のカスタム実績を作って世界にシェアしてみましょう！';
                     container.innerHTML += `
-                        <div style="text-align:center; color:var(--text-secondary); font-size:0.8rem; padding:30px; background:var(--surface-card); border-radius:12px; border:1px solid var(--border-color);">
-                            フォローしているユーザーの投稿がまだありません。<br>「検索」タブから友達を探してフォローしてみましょう！
+                        <div style="text-align:center; color:var(--text-secondary); font-size:0.8rem; padding:30px; background:var(--surface-card); border-radius:12px; border:1px solid var(--border-color); line-height:1.5;">
+                            ${emptyText}
                         </div>
                     `;
                 }
