@@ -2865,21 +2865,29 @@
         }
 
 
-        async function openUserFromFeed(targetUid) {
+                async function openUserFromFeed(targetUid) {
             if (!targetUid) return;
             if (currentUser && targetUid === currentUser.uid) {
-                switchMainTab('profile');
+                switchTab('mypage');
                 return;
             }
             try {
-                const doc = await withTimeout(db.collection('users').doc(targetUid).get(), 2000);
+                const doc = await withTimeout(db.collection('users').doc(targetUid).get(), 3000);
                 if (doc && doc.exists) {
                     viewUserProfile(targetUid, doc.data());
+                    setTimeout(() => {
+                        window.scrollTo(0, 0);
+                        document.documentElement.scrollTop = 0;
+                        document.body.scrollTop = 0;
+                        document.querySelectorAll('div, main').forEach(el => {
+                            if (el.scrollTop > 0) el.scrollTop = 0;
+                        });
+                    }, 50);
                     return;
                 }
             } catch (e) {}
             try {
-                const idxDoc = await withTimeout(db.collection('posts').doc('profile_' + targetUid).get(), 2000);
+                const idxDoc = await withTimeout(db.collection('posts').doc(targetUid).get(), 3000);
                 if (idxDoc && idxDoc.exists) {
                     const d = idxDoc.data();
                     viewUserProfile(targetUid, {
@@ -2889,10 +2897,18 @@
                         bio: d.bio,
                         avatar: d.userAvatar
                     });
-                    window.scrollTo({ top: 0, behavior: 'instant' });
+                    setTimeout(() => {
+                        window.scrollTo(0, 0);
+                        document.documentElement.scrollTop = 0;
+                        document.body.scrollTop = 0;
+                        document.querySelectorAll('div, main').forEach(el => {
+                            if (el.scrollTop > 0) el.scrollTop = 0;
+                        });
+                    }, 50);
                 }
             } catch (e) {}
         }
+
 
         async function toggleLike(postId, currentLiked, postOwnerUid) {
             if (!currentUser) return;
